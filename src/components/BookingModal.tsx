@@ -115,6 +115,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
     try {
       const result = await createAgendamento({
+        trainer_id: profile.id || undefined,
         nome: nome.trim(),
         whatsapp: cleanPhone,
         objetivo,

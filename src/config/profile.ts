@@ -5,6 +5,8 @@ import { ProfileConfig } from '../types';
  * Altere apenas os dados abaixo para personalizar completamente o Biosite para qualquer profissional!
  */
 export const profileConfig: ProfileConfig = {
+  // ID do Personal (Tenant) configurável via variável de ambiente ou ID padrão
+  id: import.meta.env.VITE_TRAINER_ID || undefined,
   name: "Rodrigo 'Thor' Silveira",
   role: "Personal Trainer & Consultoria de Alta Performance",
   cref: "CREF 084920-G/SP",

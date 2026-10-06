@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { LeadAgendamento, LeadStatus } from '../types';
+import { profileConfig } from '../config/profile';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -175,14 +176,22 @@ function saveLocalLeads(leads: LeadAgendamento[]): void {
 }
 
 /**
- * Cria um novo agendamento
+ * Cria um novo agendamento (suporta multi-tenant via trainer_id)
  */
 export async function createAgendamento(
   data: Omit<LeadAgendamento, 'id' | 'created_at' | 'status'> & { status?: LeadStatus }
 ): Promise<{ success: boolean; data?: LeadAgendamento; error?: string }> {
   const currentIso = new Date().toISOString();
+  const effectiveTrainerId = 
+    data.trainer_id || 
+    profileConfig.id || 
+    (typeof window !== 'undefined' ? localStorage.getItem('biopersonal_trainer_id') : null) || 
+    import.meta.env.VITE_TRAINER_ID || 
+    undefined;
+
   const newLead: LeadAgendamento = {
     ...data,
+    trainer_id: effectiveTrainerId,
     id: 'lead-' + Math.random().toString(36).substring(2, 9),
     created_at: currentIso,
     updated_at: currentIso,
@@ -191,31 +200,39 @@ export async function createAgendamento(
 
   if (supabase) {
     try {
+      const payload: Record<string, any> = {
+        nome: data.nome,
+        whatsapp: data.whatsapp,
+        objetivo: data.objetivo,
+        data_preferencia: data.data_preferencia,
+        turno_preferencia: data.turno_preferencia,
+        observacoes: data.observacoes || '',
+        plano_interesse: data.plano_interesse || 'Geral',
+        status: 'Novo Lead',
+        plano_tipo: data.plano_tipo || 'Mensal',
+        plano_valor: data.plano_valor || 0,
+        data_inicio: data.data_inicio || null,
+        data_vencimento: data.data_vencimento || null,
+        horario: data.horario || null,
+        tipo_atendimento: data.tipo_atendimento || 'Presencial'
+      };
+
+      // Inclui a foreign key trainer_id se configurada
+      if (effectiveTrainerId) {
+        payload.trainer_id = effectiveTrainerId;
+      }
+
       const { data: inserted, error } = await supabase
         .from('leads_agendamentos')
-        .insert([
-          {
-            nome: data.nome,
-            whatsapp: data.whatsapp,
-            objetivo: data.objetivo,
-            data_preferencia: data.data_preferencia,
-            turno_preferencia: data.turno_preferencia,
-            observacoes: data.observacoes || '',
-            plano_interesse: data.plano_interesse || 'Geral',
-            status: 'Novo Lead',
-            plano_tipo: data.plano_tipo || 'Mensal',
-            plano_valor: data.plano_valor || 0,
-            data_inicio: data.data_inicio || null,
-            data_vencimento: data.data_vencimento || null,
-            horario: data.horario || null,
-            tipo_atendimento: data.tipo_atendimento || 'Presencial'
-          }
-        ])
+        .insert([payload])
         .select()
         .single();
 
       if (!error && inserted) {
         return { success: true, data: inserted as LeadAgendamento };
+      }
+      if (error) {
+        console.error('Erro ao inserir lead no Supabase com trainer_id:', error);
       }
     } catch (e) {
       console.warn('Supabase erro, fallback para local storage:', e);
@@ -228,25 +245,45 @@ export async function createAgendamento(
 }
 
 /**
- * Busca leads com ordenação
+ * Busca leads com ordenação e filtro estrito por trainer_id (multi-tenant)
  */
-export async function getLeads(): Promise<LeadAgendamento[]> {
+export async function getLeads(trainerId?: string): Promise<LeadAgendamento[]> {
+  const effectiveTrainerId = 
+    trainerId || 
+    profileConfig.id || 
+    (typeof window !== 'undefined' ? localStorage.getItem('biopersonal_trainer_id') : null) || 
+    import.meta.env.VITE_TRAINER_ID || 
+    undefined;
+
   if (supabase) {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('leads_agendamentos')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('*');
+
+      // Filtra estritamente os leads do personal autenticado
+      if (effectiveTrainerId) {
+        query = query.eq('trainer_id', effectiveTrainerId);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (!error && data) {
         return data as LeadAgendamento[];
+      }
+      if (error) {
+        console.error('Erro ao buscar leads filtrados por trainer_id no Supabase:', error);
       }
     } catch (e) {
       console.warn('Supabase erro ao buscar leads, usando localStorage:', e);
     }
   }
 
-  return getLocalLeads();
+  const local = getLocalLeads();
+  if (effectiveTrainerId) {
+    return local.filter(l => !l.trainer_id || l.trainer_id === effectiveTrainerId);
+  }
+  return local;
 }
 
 /**

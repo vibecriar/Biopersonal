@@ -121,7 +121,8 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
   const loadLeads = async () => {
     setIsLoading(true);
     try {
-      const data = await getLeads();
+      const activeTrainerId = profile.id;
+      const data = await getLeads(activeTrainerId);
       setLeads(data);
     } catch (e) {
       console.error(e);
@@ -134,7 +135,7 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
     if (isAuthenticated) {
       loadLeads();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, profile.id]);
 
   const handleStatusChange = async (id: string, newStatus: LeadStatus) => {
     await updateLeadStatus(id, newStatus);
@@ -159,6 +160,7 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
     if (!newNome || !newWhatsapp) return;
 
     await createAgendamento({
+      trainer_id: profile.id || undefined,
       nome: newNome,
       whatsapp: newWhatsapp.replace(/\D/g, ''),
       objetivo: newObjetivo,

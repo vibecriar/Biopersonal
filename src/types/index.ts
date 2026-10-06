@@ -64,6 +64,7 @@ export interface VCardData {
 }
 
 export interface ProfileConfig {
+  id?: string; // ID ou UUID do Personal (Tenant) no Supabase
   name: string;
   role: string;
   tagline: string;
@@ -88,6 +89,7 @@ export type PlanDuration = 'Mensal' | 'Trimestral' | 'Semestral';
 
 export interface LeadAgendamento {
   id: string;
+  trainer_id?: string; // Chave estrangeira para a tabela trainers
   created_at: string;
   updated_at?: string;
   nome: string;
