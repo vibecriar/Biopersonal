@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  body {
+    background-color: #08090C;
+    font-family: 'Montserrat', 'Inter', sans-serif;
+    color: #F8FAFC;
+    overflow-x: hidden;
+  }
+}
+
+@layer utilities {
+  /* Cartões Vitrificados Premium (Glassmorphism Dark Fitness) */
+  .glass-card {
+    background: rgba(18, 20, 26, 0.65);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+  }
+
+  .glass-card-interactive {
+    background: rgba(22, 25, 34, 0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .glass-card-interactive:hover {
+    background: rgba(30, 35, 48, 0.75);
+    border-color: rgba(255, 122, 0, 0.4);
+    box-shadow: 0 12px 35px rgba(255, 122, 0, 0.15), 0 4px 20px rgba(0, 0, 0, 0.5);
+    transform: translateY(-2px);
+  }
+
+  .glass-modal {
+    background: rgba(12, 14, 18, 0.9);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 40px rgba(255, 122, 0, 0.1);
+  }
+
+  .glass-input {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #FFFFFF;
+    transition: all 0.2s ease;
+  }
+
+  .glass-input:focus {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: #FF7A00;
+    box-shadow: 0 0 0 2px rgba(255, 122, 0, 0.25);
+    outline: none;
+  }
+
+  /* Anel pulsante da Logo com Glow Laranja */
+  .logo-pulse-ring {
+    position: relative;
+    border-radius: 9999px;
+  }
+
+  .logo-pulse-ring::before {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 9999px;
+    background: radial-gradient(circle, rgba(255, 122, 0, 0.8) 0%, rgba(255, 122, 0, 0) 70%);
+    z-index: -1;
+    animation: pulseRingGlow 2.5s infinite ease-in-out;
+  }
+
+  @keyframes pulseRingGlow {
+    0%, 100% {
+      transform: scale(0.98);
+      opacity: 0.5;
+      box-shadow: 0 0 20px rgba(255, 122, 0, 0.4);
+    }
+    50% {
+      transform: scale(1.08);
+      opacity: 0.9;
+      box-shadow: 0 0 40px rgba(255, 122, 0, 0.85), 0 0 70px rgba(255, 122, 0, 0.35);
+    }
+  }
+
+  /* Gradiente de texto chamativo */
+  .text-gradient-orange {
+    background: linear-gradient(135deg, #FFF0E0 0%, #FF7A00 60%, #EA580C 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #08090C;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #FF7A00;
+}
