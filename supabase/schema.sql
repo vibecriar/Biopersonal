@@ -94,54 +94,60 @@ END $$;
 ALTER TABLE public.trainers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.leads_agendamentos ENABLE ROW LEVEL SECURITY;
 
--- 4. Políticas de Acesso
+-- 4. Concessão explícita de permissões do banco (DCL) para os papéis da API Supabase
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT ALL ON TABLE public.trainers TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.leads_agendamentos TO anon, authenticated, service_role;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+
+-- 5. Políticas de Acesso RLS para anon e authenticated
 DROP POLICY IF EXISTS "Permitir leitura pública de trainers" ON public.trainers;
 CREATE POLICY "Permitir leitura pública de trainers" 
 ON public.trainers 
 FOR SELECT 
-TO public 
+TO anon, authenticated 
 USING (true);
 
 DROP POLICY IF EXISTS "Permitir inserção de trainers" ON public.trainers;
 CREATE POLICY "Permitir inserção de trainers" 
 ON public.trainers 
 FOR INSERT 
-TO public 
+TO anon, authenticated 
 WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Permitir atualização de trainers" ON public.trainers;
 CREATE POLICY "Permitir atualização de trainers" 
 ON public.trainers 
 FOR UPDATE 
-TO public 
+TO anon, authenticated 
 USING (true);
 
 DROP POLICY IF EXISTS "Permitir inserção pública de novos leads" ON public.leads_agendamentos;
 CREATE POLICY "Permitir inserção pública de novos leads" 
 ON public.leads_agendamentos 
 FOR INSERT 
-TO public 
+TO anon, authenticated 
 WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Permitir leitura de leads" ON public.leads_agendamentos;
 CREATE POLICY "Permitir leitura de leads" 
 ON public.leads_agendamentos 
 FOR SELECT 
-TO public 
+TO anon, authenticated 
 USING (true);
 
 DROP POLICY IF EXISTS "Permitir atualização de leads" ON public.leads_agendamentos;
 CREATE POLICY "Permitir atualização de leads" 
 ON public.leads_agendamentos 
 FOR UPDATE 
-TO public 
+TO anon, authenticated 
 USING (true);
 
 DROP POLICY IF EXISTS "Permitir exclusão de leads" ON public.leads_agendamentos;
 CREATE POLICY "Permitir exclusão de leads" 
 ON public.leads_agendamentos 
 FOR DELETE 
-TO public 
+TO anon, authenticated 
 USING (true);
 
 -- 5. Índices para performance e consultas multi-tenant

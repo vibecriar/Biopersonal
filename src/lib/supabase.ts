@@ -2,23 +2,54 @@ import { createClient } from '@supabase/supabase-js';
 import { LeadAgendamento, LeadStatus, ProfileConfig } from '../types';
 import { profileConfig } from '../config/profile';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const rawSupabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const rawSupabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+// Sanitização estrita contra espaços, aspas acidentais e quebras de linha no .env
+export const supabaseUrl = typeof rawSupabaseUrl === 'string' 
+  ? rawSupabaseUrl.trim().replace(/^["']|["']$/g, '') 
+  : '';
+export const supabaseAnonKey = typeof rawSupabaseAnonKey === 'string' 
+  ? rawSupabaseAnonKey.trim().replace(/^["']|["']$/g, '') 
+  : '';
 
 export const isSupabaseConfigured = (): boolean => {
   return (
     typeof supabaseUrl === 'string' &&
-    supabaseUrl.trim().length > 0 &&
+    supabaseUrl.length > 0 &&
     !supabaseUrl.includes('placeholder') &&
+    !supabaseUrl.includes('your-project') &&
     typeof supabaseAnonKey === 'string' &&
-    supabaseAnonKey.trim().length > 0 &&
-    !supabaseAnonKey.includes('placeholder')
+    supabaseAnonKey.length > 0 &&
+    !supabaseAnonKey.includes('placeholder') &&
+    !supabaseAnonKey.includes('your-anon-key')
   );
 };
 
+// Cliente Supabase com persistência desabilitada para anon e headers explícitos
+// evitando que sessões expiradas em localStorage sobreponham a chave pública com 401
 export const supabase = isSupabaseConfigured()
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+        storageKey: 'biopersonal_anon_auth'
+      },
+      global: {
+        headers: {
+          apikey: supabaseAnonKey,
+          Authorization: `Bearer ${supabaseAnonKey}`
+        }
+      }
+    })
   : null;
+
+// Helper para validar UUID antes de passar para cláusulas SQL/PostgreSQL
+export const isValidUuid = (val?: string | null): boolean => {
+  if (!val || typeof val !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim());
+};
 
 const STORAGE_KEY = 'biopersonal_leads_crm_v3';
 
@@ -176,22 +207,25 @@ function saveLocalLeads(leads: LeadAgendamento[]): void {
 }
 
 /**
- * Cria um novo agendamento (suporta multi-tenant via trainer_id)
+ * Cria um novo agendamento (suporta multi-tenant via trainer_id e inserção anônima segura)
  */
 export async function createAgendamento(
   data: Omit<LeadAgendamento, 'id' | 'created_at' | 'status'> & { status?: LeadStatus }
 ): Promise<{ success: boolean; data?: LeadAgendamento; error?: string }> {
   const currentIso = new Date().toISOString();
-  const effectiveTrainerId = 
+
+  // Valida estritamente se o trainer_id é um UUID para evitar erros de FK e sintaxe no Postgres
+  const candidateTrainerId = 
     data.trainer_id || 
-    profileConfig.id || 
     (typeof window !== 'undefined' ? localStorage.getItem('biopersonal_trainer_id') : null) || 
     import.meta.env.VITE_TRAINER_ID || 
-    undefined;
+    profileConfig.id;
+
+  const validTrainerId = isValidUuid(candidateTrainerId) ? candidateTrainerId!.trim() : undefined;
 
   const newLead: LeadAgendamento = {
     ...data,
-    trainer_id: effectiveTrainerId,
+    trainer_id: validTrainerId,
     id: 'lead-' + Math.random().toString(36).substring(2, 9),
     created_at: currentIso,
     updated_at: currentIso,
@@ -202,42 +236,57 @@ export async function createAgendamento(
   if (supabase) {
     try {
       const payload: Record<string, any> = {
-        nome: data.nome,
-        whatsapp: data.whatsapp,
+        nome: data.nome.trim(),
+        whatsapp: data.whatsapp.replace(/\D/g, ''),
         objetivo: data.objetivo,
         data_preferencia: data.data_preferencia,
         turno_preferencia: data.turno_preferencia,
-        observacoes: data.observacoes || '',
-        plano_interesse: data.plano_interesse || 'Geral',
-        status: 'Novo Lead',
+        observacoes: (data.observacoes || '').trim(),
+        plano_interesse: data.plano_interesse || 'Avaliação Inicial',
+        status: data.status || 'Novo Lead',
         plano_tipo: data.plano_tipo || 'Mensal',
         plano_valor: data.plano_valor || 0,
-        data_inicio: data.data_inicio || null,
-        data_vencimento: data.data_vencimento || null,
         horario: data.horario || null,
         tipo_atendimento: data.tipo_atendimento || 'Presencial',
         consentimento_lgpd: data.consentimento_lgpd !== false
       };
 
-      // Inclui a foreign key trainer_id se configurada
-      if (effectiveTrainerId) {
-        payload.trainer_id = effectiveTrainerId;
+      // Só inclui foreign key trainer_id se for um UUID válido no banco
+      if (validTrainerId) {
+        payload.trainer_id = validTrainerId;
       }
 
-      const { data: inserted, error } = await supabase
+      // Tentativa 1: Inserção com retorno de representação (.select())
+      const { data: inserted, error: selectError } = await supabase
         .from('leads_agendamentos')
         .insert([payload])
         .select()
-        .single();
+        .maybeSingle();
 
-      if (!error && inserted) {
+      if (!selectError && inserted) {
         return { success: true, data: inserted as LeadAgendamento };
       }
-      if (error) {
-        console.error('Erro ao inserir lead no Supabase com trainer_id:', error);
+
+      // Tentativa 2: Se falhar (ex: RLS restringe SELECT para anon gerando 401/42501 no representation),
+      // executa inserção direta (return=minimal) que exige estritamente apenas a permissão de INSERT
+      if (selectError) {
+        console.warn('Tentando inserção direta minimal no Supabase (bypass de select RLS):', selectError);
+        const { error: minimalError } = await supabase
+          .from('leads_agendamentos')
+          .insert([payload]);
+
+        if (!minimalError) {
+          return { success: true, data: newLead };
+        }
+
+        console.error('Falha em ambas as tentativas de inserção no Supabase:', {
+          code: minimalError.code,
+          message: minimalError.message,
+          details: minimalError.details
+        });
       }
     } catch (e) {
-      console.warn('Supabase erro, fallback para local storage:', e);
+      console.warn('Exceção ao inserir lead no Supabase, acionando fallback local:', e);
     }
   }
 
@@ -250,12 +299,13 @@ export async function createAgendamento(
  * Busca leads com ordenação e filtro estrito por trainer_id (multi-tenant)
  */
 export async function getLeads(trainerId?: string): Promise<LeadAgendamento[]> {
-  const effectiveTrainerId = 
+  const candidateTrainerId = 
     trainerId || 
-    profileConfig.id || 
     (typeof window !== 'undefined' ? localStorage.getItem('biopersonal_trainer_id') : null) || 
     import.meta.env.VITE_TRAINER_ID || 
-    undefined;
+    profileConfig.id;
+
+  const validTrainerId = isValidUuid(candidateTrainerId) ? candidateTrainerId!.trim() : undefined;
 
   if (supabase) {
     try {
@@ -263,9 +313,9 @@ export async function getLeads(trainerId?: string): Promise<LeadAgendamento[]> {
         .from('leads_agendamentos')
         .select('*');
 
-      // Filtra estritamente os leads do personal autenticado
-      if (effectiveTrainerId) {
-        query = query.eq('trainer_id', effectiveTrainerId);
+      // Só aplica filtro eq('trainer_id', ...) se for um UUID válido no banco
+      if (validTrainerId) {
+        query = query.eq('trainer_id', validTrainerId);
       }
 
       const { data, error } = await query.order('created_at', { ascending: false });
@@ -274,7 +324,7 @@ export async function getLeads(trainerId?: string): Promise<LeadAgendamento[]> {
         return data as LeadAgendamento[];
       }
       if (error) {
-        console.error('Erro ao buscar leads filtrados por trainer_id no Supabase:', error);
+        console.error('Erro ao buscar leads no Supabase:', error);
       }
     } catch (e) {
       console.warn('Supabase erro ao buscar leads, usando localStorage:', e);
@@ -282,8 +332,8 @@ export async function getLeads(trainerId?: string): Promise<LeadAgendamento[]> {
   }
 
   const local = getLocalLeads();
-  if (effectiveTrainerId) {
-    return local.filter(l => !l.trainer_id || l.trainer_id === effectiveTrainerId);
+  if (validTrainerId) {
+    return local.filter(l => !l.trainer_id || l.trainer_id === validTrainerId);
   }
   return local;
 }
@@ -380,7 +430,7 @@ export async function getTrainer(trainerId?: string): Promise<ProfileConfig> {
   if (supabase) {
     try {
       let query = supabase.from('trainers').select('*');
-      if (effectiveId) {
+      if (effectiveId && isValidUuid(effectiveId)) {
         query = query.eq('id', effectiveId);
       }
       const { data, error } = await query.limit(1).maybeSingle();
