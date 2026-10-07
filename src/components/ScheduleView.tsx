@@ -24,6 +24,8 @@ interface ScheduleViewProps {
   leads: LeadAgendamento[];
   profile: ProfileConfig;
   onOpenNewBookingWithDate?: (date: string, hour?: string) => void;
+  onStatusChange?: (id: string, newStatus: LeadStatus) => void;
+  onUpdateLeadBooking?: (id: string, updates: Partial<LeadAgendamento>) => Promise<void> | void;
   onShowToast: (msg: string) => void;
 }
 
@@ -41,10 +43,46 @@ const MONTHS_NAMES = [
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
 ];
 
+/**
+ * Normaliza datas para comparação segura (YYYY-MM-DD)
+ */
+export const normalizeDate = (d?: string): string => {
+  if (!d) return '';
+  return d.split('T')[0].trim();
+};
+
+/**
+ * Retorna o horário efetivo do lead (com fallback inteligente pelo turno caso seja um registro legado)
+ * Manhã = 08:00, Tarde = 15:00, Noite = 19:00
+ */
+export const getEffectiveLeadHour = (lead: LeadAgendamento): string => {
+  if (lead.horario && lead.horario.trim().length > 0) {
+    let raw = lead.horario.trim();
+    if (/^\d:\d\d/.test(raw)) {
+      raw = '0' + raw;
+    }
+    if (/^\d\d:\d\d:\d\d/.test(raw)) {
+      raw = raw.slice(0, 5);
+    }
+    return raw;
+  }
+  switch (lead.turno_preferencia) {
+    case 'Tarde':
+      return '15:00';
+    case 'Noite':
+      return '19:00';
+    case 'Manhã':
+    default:
+      return '08:00';
+  }
+};
+
 export const ScheduleView: React.FC<ScheduleViewProps> = ({
   leads,
   profile,
   onOpenNewBookingWithDate,
+  onStatusChange,
+  onUpdateLeadBooking,
   onShowToast
 }) => {
   const [periodMode, setPeriodMode] = useState<PeriodMode>('hoje');
@@ -120,25 +158,34 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     const cleanPhone = lead.whatsapp.replace(/\D/g, '');
     const firstName = lead.nome.split(' ')[0];
     const trainerName = profile.name.split(' ')[0];
+    const hour = getEffectiveLeadHour(lead);
     const text = encodeURIComponent(
-      `Olá, ${firstName}! Aqui é o ${trainerName}. Estou te esperando aqui na recepção/sala de musculação para o nosso treino/avaliação! Bora começar?`
+      `Olá, ${firstName}! Aqui é o ${trainerName}. Nosso agendamento está marcado para ${hour}. Estou te aguardando na recepção/sala! Bora começar?`
     );
     window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank', 'noopener,noreferrer');
   };
 
-  // Mapeamento de atendimentos válidos (convertidos ou agendados)
+  // Confirmação rápida de agendamento (Muda de 'Novo Lead' para 'Avaliação Agendada')
+  const handleConfirmBooking = (lead: LeadAgendamento) => {
+    onStatusChange?.(lead.id, 'Avaliação Agendada');
+    onShowToast(`Vaga confirmada para ${lead.nome}! Status atualizado para "Avaliação Agendada".`);
+  };
+
+  // Mapeamento de atendimentos válidos (inclui Novos Leads, Avaliações Agendadas e Convertidos com data)
   const scheduledLeads = useMemo(() => {
     return leads.filter(l => 
-      l.status === 'Avaliação Agendada' || 
-      l.status === 'Convertido' ||
-      Boolean(l.horario) ||
-      Boolean(l.data_preferencia)
+      Boolean(l.data_preferencia) && (
+        l.status === 'Novo Lead' ||
+        l.status === 'Avaliação Agendada' || 
+        l.status === 'Convertido' ||
+        l.status === 'Contato Feito'
+      )
     );
   }, [leads]);
 
-  // Atendimentos do dia atual (Visão HOJE)
+  // Atendimentos do dia atual (Visão HOJE) com normalização de data
   const todaySessions = useMemo(() => {
-    return scheduledLeads.filter(l => l.data_preferencia === currentDateStr);
+    return scheduledLeads.filter(l => normalizeDate(l.data_preferencia) === currentDateStr);
   }, [scheduledLeads, currentDateStr]);
 
   // Helper de cor para tipo de atendimento
@@ -162,14 +209,10 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     return (
       <div className="space-y-3">
         {TIME_SLOTS.map((hour) => {
-          // Busca lead neste horário exato
-          const match = todaySessions.find(l => {
-            if (l.horario) return l.horario === hour;
-            // Se não tiver horário exato cadastrado, distribui no turno correspondente
-            if (hour === '07:00' && l.turno_preferencia === 'Manhã') return true;
-            if (hour === '15:00' && l.turno_preferencia === 'Tarde') return true;
-            if (hour === '19:00' && l.turno_preferencia === 'Noite') return true;
-            return false;
+          // Busca todos os leads neste horário exato ou fallback do turno
+          const slotLeads = todaySessions.filter(l => {
+            const h = getEffectiveLeadHour(l);
+            return h === hour || h.startsWith(hour.slice(0, 2) + ':');
           });
 
           return (
@@ -182,48 +225,123 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
               </div>
 
               {/* Slot do Horário */}
-              <div className="flex-1">
-                {match ? (
-                  <motion.div
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="p-3.5 sm:p-4 rounded-2xl glass-card border border-brand-500/40 hover:border-brand-500 shadow-md shadow-black/40 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-gradient-to-r from-brand-500/10 via-transparent to-transparent"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-xl bg-brand-500/20 text-brand-400 border border-brand-500/30">
-                        <Dumbbell className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-bold text-sm text-white">{match.nome}</h4>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getServiceTypeBadge(match.tipo_atendimento, match.status)}`}>
-                            {match.tipo_atendimento || (match.status === 'Avaliação Agendada' ? 'Avaliação' : 'Presencial')}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5 font-mono">
-                          <span>{match.whatsapp}</span>
-                          <span>•</span>
-                          <span className="text-slate-300 font-sans">{match.objetivo}</span>
-                          {match.plano_interesse && (
-                            <>
+              <div
+                className="flex-1 space-y-2.5"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                }}
+                onDrop={async (e) => {
+                  e.preventDefault();
+                  const leadId = e.dataTransfer.getData('text/plain');
+                  if (leadId) {
+                    if (onUpdateLeadBooking) {
+                      await onUpdateLeadBooking(leadId, {
+                        data_preferencia: currentDateStr,
+                        horario: hour,
+                        status: 'Avaliação Agendada'
+                      });
+                    } else if (onStatusChange) {
+                      onStatusChange(leadId, 'Avaliação Agendada');
+                    }
+                    onShowToast(`Horário das ${hour} confirmado para hoje!`);
+                  }
+                }}
+              >
+                {slotLeads.length > 0 ? (
+                  slotLeads.map((match) => {
+                    const isNewLead = match.status === 'Novo Lead';
+
+                    return (
+                      <motion.div
+                        key={match.id}
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        draggable
+                        onDragStart={(e: any) => {
+                          if (e?.dataTransfer) {
+                            e.dataTransfer.setData('text/plain', match.id);
+                            e.dataTransfer.effectAllowed = 'move';
+                          }
+                        }}
+                        className={`p-3.5 sm:p-4 rounded-2xl glass-card transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md shadow-black/40 cursor-grab active:cursor-grabbing ${
+                          isNewLead
+                            ? 'border-2 border-dashed border-amber-400/80 bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent hover:border-amber-300 shadow-[0_0_15px_rgba(251,191,36,0.1)]'
+                            : 'border border-brand-500/40 hover:border-brand-500 bg-gradient-to-r from-brand-500/10 via-transparent to-transparent'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2.5 rounded-xl border ${
+                            isNewLead
+                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse'
+                              : 'bg-brand-500/20 text-brand-400 border border-brand-500/30'
+                          }`}>
+                            <Dumbbell className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-bold text-sm text-white">{match.nome}</h4>
+                              {isNewLead ? (
+                                <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-amber-500/25 text-amber-300 border border-amber-500/40 flex items-center gap-1 animate-pulse">
+                                  <Clock className="w-3 h-3" />
+                                  Aguardando Confirmação
+                                </span>
+                              ) : (
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getServiceTypeBadge(match.tipo_atendimento, match.status)}`}>
+                                  {match.tipo_atendimento || (match.status === 'Avaliação Agendada' ? 'Avaliação Agendada' : 'Presencial')}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5 font-mono flex-wrap">
+                              <span>{match.whatsapp}</span>
                               <span>•</span>
-                              <span className="text-brand-400 font-sans">{match.plano_interesse}</span>
+                              <span className="text-slate-300 font-sans">{match.objetivo}</span>
+                              <span>•</span>
+                              <span className="text-brand-400 font-sans font-bold">{getEffectiveLeadHour(match)} ({match.turno_preferencia})</span>
+                              {match.plano_interesse && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-amber-400 font-sans">{match.plano_interesse}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Botões de Ação */}
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                          {isNewLead ? (
+                            <>
+                              <button
+                                onClick={() => handleConfirmBooking(match)}
+                                className="min-h-[44px] flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-gradient-to-r from-brand-500 to-amber-500 hover:from-brand-600 hover:to-amber-600 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-md shadow-brand-500/25 transition-all cursor-pointer"
+                                title="Confirmar vaga na grade"
+                              >
+                                <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                                <span>Confirmar Vaga</span>
+                              </button>
+                              <button
+                                onClick={() => sendWaitingWhatsApp(match)}
+                                className="p-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                                title="Falar no WhatsApp"
+                              >
+                                <MessageCircle className="w-4 h-4 text-emerald-400" />
+                              </button>
                             </>
+                          ) : (
+                            <button
+                              onClick={() => sendWaitingWhatsApp(match)}
+                              className="min-h-[44px] w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-emerald-500/20 transition-all cursor-pointer"
+                              title="Enviar WhatsApp: Estou te esperando na recepção"
+                            >
+                              <MapPin className="w-4 h-4" />
+                              <span>Estou te esperando!</span>
+                            </button>
                           )}
                         </div>
-                      </div>
-                    </div>
-
-                    {/* Botão WhatsApp: "Estou te esperando" */}
-                    <button
-                      onClick={() => sendWaitingWhatsApp(match)}
-                      className="min-h-[44px] w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-emerald-500/20 transition-all cursor-pointer"
-                      title="Enviar WhatsApp: Estou te esperando na recepção"
-                    >
-                      <MapPin className="w-4 h-4" />
-                      <span>Estou te esperando!</span>
-                    </button>
-                  </motion.div>
+                      </motion.div>
+                    );
+                  })
                 ) : (
                   <button
                     onClick={() => onOpenNewBookingWithDate?.(currentDateStr, hour)}
@@ -252,7 +370,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   const renderWeekGrid = () => {
     // Calcula as datas de Segunda a Sábado da semana atual
     const d = new Date(currentDate);
-    const dayOfWeek = d.getDay();
+    const dayOfWeek = d.getDay(); // 0 is Sunday, 1 is Monday
     const distanceToMon = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
     const monday = new Date(d);
     monday.setDate(d.getDate() + distanceToMon);
@@ -269,11 +387,9 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
       };
     });
 
-    const KEY_HOURS = ['07:00', '08:00', '09:00', '10:00', '11:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
-
     return (
       <div className="overflow-x-auto rounded-2xl glass-card border border-white/10 pb-2">
-        <table className="w-full text-left border-collapse min-w-[750px]">
+        <table className="w-full text-left border-collapse min-w-[780px]">
           <thead>
             <tr className="border-b border-white/10 bg-white/5">
               <th className="p-3 w-16 text-center text-slate-400 text-xs font-mono font-bold">
@@ -293,36 +409,106 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5 text-xs">
-            {KEY_HOURS.map(hour => (
+            {TIME_SLOTS.map(hour => (
               <tr key={hour} className="hover:bg-white/[0.02] transition-colors">
                 <td className="p-2.5 text-center font-mono text-slate-500 font-bold border-r border-white/5">
                   {hour}
                 </td>
                 {weekDaysList.map(w => {
-                  const match = scheduledLeads.find(l => l.data_preferencia === w.dateStr && (l.horario === hour || (!l.horario && hour === '08:00' && l.turno_preferencia === 'Manhã')));
+                  const slotLeads = scheduledLeads.filter(l => {
+                    if (normalizeDate(l.data_preferencia) !== w.dateStr) return false;
+                    const h = getEffectiveLeadHour(l);
+                    return h === hour || h.startsWith(hour.slice(0, 2) + ':');
+                  });
 
                   return (
                     <td
                       key={w.dateStr}
-                      className="p-1.5 border-r border-white/5 align-top h-14"
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                      }}
+                      onDrop={async (e) => {
+                        e.preventDefault();
+                        const leadId = e.dataTransfer.getData('text/plain');
+                        if (leadId) {
+                          if (onUpdateLeadBooking) {
+                            await onUpdateLeadBooking(leadId, {
+                              data_preferencia: w.dateStr,
+                              horario: hour,
+                              status: 'Avaliação Agendada'
+                            });
+                          } else if (onStatusChange) {
+                            onStatusChange(leadId, 'Avaliação Agendada');
+                          }
+                          onShowToast(`Vaga agendada para ${w.name} às ${hour}!`);
+                        }
+                      }}
+                      className="p-1.5 border-r border-white/5 align-top min-h-14 space-y-1.5"
                     >
-                      {match ? (
-                        <div
-                          onClick={() => sendWaitingWhatsApp(match)}
-                          className="p-2 rounded-xl bg-brand-500/20 border border-brand-500/40 hover:border-brand-500 transition-all cursor-pointer shadow-sm group"
-                        >
-                          <div className="font-bold text-white text-[11px] truncate group-hover:text-brand-400">
-                            {match.nome}
-                          </div>
-                          <div className="text-[9px] text-brand-300 font-medium truncate flex items-center justify-between">
-                            <span>{match.tipo_atendimento || 'Presencial'}</span>
-                            <MessageCircle className="w-2.5 h-2.5 opacity-80" />
-                          </div>
-                        </div>
+                      {slotLeads.length > 0 ? (
+                        slotLeads.map(match => {
+                          const isNewLead = match.status === 'Novo Lead';
+                          return isNewLead ? (
+                            <div
+                              key={match.id}
+                              draggable
+                              onDragStart={(e) => {
+                                e.dataTransfer.setData('text/plain', match.id);
+                                e.dataTransfer.effectAllowed = 'move';
+                              }}
+                              className="p-2 rounded-xl border-2 border-dashed border-amber-400/80 bg-amber-500/20 hover:border-amber-300 transition-all cursor-grab active:cursor-grabbing shadow-sm group relative"
+                            >
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="font-black text-white text-[11px] truncate group-hover:text-amber-300">
+                                  {match.nome}
+                                </span>
+                                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0" />
+                              </div>
+                              <div className="text-[9px] text-amber-300 font-bold truncate flex items-center justify-between mt-0.5">
+                                <span>Aguardando Confirmação</span>
+                                <span className="font-mono text-[9px] text-amber-200/90">{getEffectiveLeadHour(match)}</span>
+                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleConfirmBooking(match);
+                                }}
+                                className="mt-1.5 w-full py-1 px-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[9px] uppercase tracking-wider flex items-center justify-center gap-1 shadow transition-all cursor-pointer"
+                                title="Confirmar vaga"
+                              >
+                                <CheckCircle2 className="w-3 h-3 stroke-[2.5]" />
+                                <span>Confirmar Vaga</span>
+                              </button>
+                            </div>
+                          ) : (
+                            <div
+                              key={match.id}
+                              draggable
+                              onDragStart={(e) => {
+                                e.dataTransfer.setData('text/plain', match.id);
+                                e.dataTransfer.effectAllowed = 'move';
+                              }}
+                              onClick={() => sendWaitingWhatsApp(match)}
+                              className="p-2 rounded-xl bg-brand-500/20 border border-brand-500/40 hover:border-brand-500 transition-all cursor-grab active:cursor-grabbing shadow-sm group"
+                            >
+                              <div className="flex items-center justify-between gap-1">
+                                <div className="font-bold text-white text-[11px] truncate group-hover:text-brand-400">
+                                  {match.nome}
+                                </div>
+                                <span className="text-[9px] font-mono text-brand-300/80">{getEffectiveLeadHour(match)}</span>
+                              </div>
+                              <div className="text-[9px] text-brand-300 font-medium truncate flex items-center justify-between mt-0.5">
+                                <span>{match.tipo_atendimento || (match.status === 'Avaliação Agendada' ? 'Avaliação Agendada' : 'Presencial')}</span>
+                                <MessageCircle className="w-2.5 h-2.5 opacity-80" />
+                              </div>
+                            </div>
+                          );
+                        })
                       ) : (
                         <button
                           onClick={() => onOpenNewBookingWithDate?.(w.dateStr, hour)}
-                          className="w-full h-full rounded-lg hover:bg-white/5 text-transparent hover:text-slate-500 flex items-center justify-center text-[10px] transition-all cursor-pointer"
+                          className="w-full h-full min-h-[42px] rounded-lg hover:bg-white/5 text-transparent hover:text-slate-500 flex items-center justify-center text-[10px] transition-all cursor-pointer"
                         >
                           +
                         </button>
@@ -368,6 +554,10 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
           {/* Legenda de Cores */}
           <div className="flex flex-wrap items-center justify-end gap-4 pb-3 mb-3 border-b border-white/10 text-xs">
             <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
+              <span className="text-slate-300 text-[11px]">Novo Lead (Aguardando)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-brand-500 shadow-[0_0_8px_rgba(255,122,0,0.8)]" />
               <span className="text-slate-300 text-[11px]">Avaliação / Treino Agendado</span>
             </div>
@@ -396,9 +586,9 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
               const isSelected = selectedDayDetails === cellDateStr;
 
               // Sessões neste dia
-              const daySessions = scheduledLeads.filter(l => l.data_preferencia === cellDateStr);
+              const daySessions = scheduledLeads.filter(l => normalizeDate(l.data_preferencia) === cellDateStr);
               // Vencimentos neste dia
-              const dayExpirations = leads.filter(l => l.data_vencimento === cellDateStr);
+              const dayExpirations = leads.filter(l => normalizeDate(l.data_vencimento) === cellDateStr);
 
               return (
                 <div
@@ -428,7 +618,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                     {daySessions.length > 0 && (
                       <div className="flex items-center gap-1 text-[10px] text-brand-300 font-semibold truncate bg-brand-500/10 px-1 py-0.5 rounded">
                         <span className="w-1.5 h-1.5 rounded-full bg-brand-500 shrink-0" />
-                        <span className="truncate">{daySessions.length} aula{daySessions.length > 1 ? 's' : ''}</span>
+                        <span className="truncate">{daySessions.length} vaga{daySessions.length > 1 ? 's' : ''}</span>
                       </div>
                     )}
                     {dayExpirations.length > 0 && (
@@ -460,7 +650,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                   setCurrentDate(new Date(selectedDayDetails + 'T12:00:00'));
                   setPeriodMode('hoje');
                 }}
-                className="text-xs font-bold text-brand-400 hover:text-brand-300 flex items-center gap-1"
+                className="text-xs font-bold text-brand-400 hover:text-brand-300 flex items-center gap-1 cursor-pointer"
               >
                 <span>Ver Timeline Deste Dia</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -468,21 +658,46 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
             </div>
 
             <div className="space-y-2">
-              {scheduledLeads.filter(l => l.data_preferencia === selectedDayDetails).map(l => (
-                <div key={l.id} className="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/10 text-xs">
-                  <div>
-                    <span className="font-bold text-white mr-2">{l.nome}</span>
-                    <span className="text-slate-400">({l.horario || l.turno_preferencia}) • {l.objetivo}</span>
+              {scheduledLeads.filter(l => normalizeDate(l.data_preferencia) === selectedDayDetails).map(l => {
+                const isNew = l.status === 'Novo Lead';
+                return (
+                  <div key={l.id} className={`flex items-center justify-between p-2.5 rounded-xl border text-xs ${
+                    isNew ? 'bg-amber-500/15 border-amber-500/40' : 'bg-white/5 border-white/10'
+                  }`}>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-white mr-1">{l.nome}</span>
+                        {isNew && (
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/25 text-amber-300 border border-amber-500/40">
+                            Aguardando Confirmação
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-slate-400">({getEffectiveLeadHour(l)} • {l.turno_preferencia}) • {l.objetivo}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {isNew && (
+                        <button
+                          onClick={() => handleConfirmBooking(l)}
+                          className="py-1 px-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-colors flex items-center gap-1 cursor-pointer"
+                          title="Confirmar vaga"
+                        >
+                          <CheckCircle2 className="w-3 h-3 stroke-[2.5]" />
+                          <span>Confirmar</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => sendWaitingWhatsApp(l)}
+                        className="py-1 px-2.5 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500 hover:text-slate-950 font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                      >
+                        <MessageCircle className="w-3 h-3" />
+                        <span>WhatsApp</span>
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => sendWaitingWhatsApp(l)}
-                    className="py-1 px-2.5 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500 hover:text-slate-950 font-bold transition-colors flex items-center gap-1"
-                  >
-                    <MessageCircle className="w-3 h-3" />
-                    <span>WhatsApp</span>
-                  </button>
-                </div>
-              ))}
+                );
+              })}
 
               {leads.filter(l => l.data_vencimento === selectedDayDetails).map(l => (
                 <div key={`venc-${l.id}`} className="flex items-center justify-between p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs">
@@ -522,7 +737,6 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
           const monthSessions = scheduledLeads.filter(l => l.data_preferencia && l.data_preferencia.startsWith(monthStr)).length;
           const monthRenewals = leads.filter(l => l.data_vencimento && l.data_vencimento.startsWith(monthStr)).length;
 
-          // Estimativa de faturamento
           const isCurrentMonth = new Date().getFullYear() === year && new Date().getMonth() === mIdx;
 
           return (
@@ -599,7 +813,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
           <div className="flex items-center gap-1.5">
             <button
               onClick={handlePrev}
-              className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors"
+              className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors cursor-pointer"
               title="Período Anterior"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -607,14 +821,14 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
 
             <button
               onClick={handleToday}
-              className="min-h-[40px] px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-300 hover:text-brand-400 border border-white/10 transition-colors"
+              className="min-h-[40px] px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-300 hover:text-brand-400 border border-white/10 transition-colors cursor-pointer"
             >
               Hoje
             </button>
 
             <button
               onClick={handleNext}
-              className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors"
+              className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors cursor-pointer"
               title="Próximo Período"
             >
               <ChevronRight className="w-4 h-4" />

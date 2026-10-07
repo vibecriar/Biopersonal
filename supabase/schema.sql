@@ -10,10 +10,17 @@ CREATE TABLE IF NOT EXISTS public.trainers (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     name TEXT NOT NULL,
     email TEXT UNIQUE,
+    role TEXT DEFAULT 'Personal Trainer & Consultoria de Alta Performance',
     cref TEXT,
     phone TEXT,
     avatar_url TEXT,
+    bg_image_url TEXT,
+    tagline TEXT,
     bio TEXT,
+    instagram TEXT,
+    plans JSONB DEFAULT '[]'::jsonb,
+    social_proof JSONB DEFAULT '{}'::jsonb,
+    available_hours JSONB DEFAULT '{"Manhã": ["06:00","07:00","08:00","09:00","10:00","11:00"], "Tarde": ["14:00","15:00","16:00","17:00"], "Noite": ["18:00","19:00","20:00","21:00"]}'::jsonb,
     active BOOLEAN DEFAULT true
 );
 
@@ -40,20 +47,46 @@ CREATE TABLE IF NOT EXISTS public.leads_agendamentos (
 
     -- Agenda de Atendimentos
     horario TEXT,
-    tipo_atendimento TEXT DEFAULT 'Presencial' CHECK (tipo_atendimento IN ('Presencial', 'Online', 'Avaliação'))
+    tipo_atendimento TEXT DEFAULT 'Presencial' CHECK (tipo_atendimento IN ('Presencial', 'Online', 'Avaliação')),
+
+    -- Conformidade com LGPD
+    consentimento_lgpd BOOLEAN DEFAULT true
 );
 
--- Se a tabela já existia sem a coluna trainer_id, adiciona caso necessário:
+-- Migrações incrementais seguras para colunas em trainers
 DO $$
 BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_schema = 'public' 
-        AND table_name = 'leads_agendamentos' 
-        AND column_name = 'trainer_id'
-    ) THEN
-        ALTER TABLE public.leads_agendamentos 
-        ADD COLUMN trainer_id UUID REFERENCES public.trainers(id) ON DELETE CASCADE;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'trainers' AND column_name = 'role') THEN
+        ALTER TABLE public.trainers ADD COLUMN role TEXT DEFAULT 'Personal Trainer & Consultoria de Alta Performance';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'trainers' AND column_name = 'bg_image_url') THEN
+        ALTER TABLE public.trainers ADD COLUMN bg_image_url TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'trainers' AND column_name = 'tagline') THEN
+        ALTER TABLE public.trainers ADD COLUMN tagline TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'trainers' AND column_name = 'instagram') THEN
+        ALTER TABLE public.trainers ADD COLUMN instagram TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'trainers' AND column_name = 'plans') THEN
+        ALTER TABLE public.trainers ADD COLUMN plans JSONB DEFAULT '[]'::jsonb;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'trainers' AND column_name = 'social_proof') THEN
+        ALTER TABLE public.trainers ADD COLUMN social_proof JSONB DEFAULT '{}'::jsonb;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'trainers' AND column_name = 'available_hours') THEN
+        ALTER TABLE public.trainers ADD COLUMN available_hours JSONB DEFAULT '{"Manhã": ["06:00","07:00","08:00","09:00","10:00","11:00"], "Tarde": ["14:00","15:00","16:00","17:00"], "Noite": ["18:00","19:00","20:00","21:00"]}'::jsonb;
+    END IF;
+END $$;
+
+-- Migrações incrementais seguras para colunas em leads_agendamentos
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'leads_agendamentos' AND column_name = 'trainer_id') THEN
+        ALTER TABLE public.leads_agendamentos ADD COLUMN trainer_id UUID REFERENCES public.trainers(id) ON DELETE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'leads_agendamentos' AND column_name = 'consentimento_lgpd') THEN
+        ALTER TABLE public.leads_agendamentos ADD COLUMN consentimento_lgpd BOOLEAN DEFAULT true;
     END IF;
 END $$;
 
@@ -62,30 +95,49 @@ ALTER TABLE public.trainers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.leads_agendamentos ENABLE ROW LEVEL SECURITY;
 
 -- 4. Políticas de Acesso
+DROP POLICY IF EXISTS "Permitir leitura pública de trainers" ON public.trainers;
 CREATE POLICY "Permitir leitura pública de trainers" 
 ON public.trainers 
 FOR SELECT 
 TO public 
 USING (true);
 
+DROP POLICY IF EXISTS "Permitir inserção de trainers" ON public.trainers;
+CREATE POLICY "Permitir inserção de trainers" 
+ON public.trainers 
+FOR INSERT 
+TO public 
+WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Permitir atualização de trainers" ON public.trainers;
+CREATE POLICY "Permitir atualização de trainers" 
+ON public.trainers 
+FOR UPDATE 
+TO public 
+USING (true);
+
+DROP POLICY IF EXISTS "Permitir inserção pública de novos leads" ON public.leads_agendamentos;
 CREATE POLICY "Permitir inserção pública de novos leads" 
 ON public.leads_agendamentos 
 FOR INSERT 
 TO public 
 WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Permitir leitura de leads" ON public.leads_agendamentos;
 CREATE POLICY "Permitir leitura de leads" 
 ON public.leads_agendamentos 
 FOR SELECT 
 TO public 
 USING (true);
 
+DROP POLICY IF EXISTS "Permitir atualização de leads" ON public.leads_agendamentos;
 CREATE POLICY "Permitir atualização de leads" 
 ON public.leads_agendamentos 
 FOR UPDATE 
 TO public 
 USING (true);
 
+DROP POLICY IF EXISTS "Permitir exclusão de leads" ON public.leads_agendamentos;
 CREATE POLICY "Permitir exclusão de leads" 
 ON public.leads_agendamentos 
 FOR DELETE 

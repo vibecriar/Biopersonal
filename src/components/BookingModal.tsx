@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, Clock, Target, Phone, User, CheckCircle2, ArrowRight, Loader2, Sparkles } from 'lucide-react';
+import { X, Calendar, Clock, Target, Phone, User, CheckCircle2, ArrowRight, Loader2, Sparkles, ShieldCheck } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { ProfileConfig, LeadAgendamento } from '../types';
 import { createAgendamento } from '../lib/supabase';
+import { PrivacyPolicyModal } from './PrivacyPolicyModal';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -22,6 +23,12 @@ const OBJECTIVES = [
 
 const SHIFTS: Array<'Manhã' | 'Tarde' | 'Noite'> = ['Manhã', 'Tarde', 'Noite'];
 
+const DEFAULT_SHIFT_HOURS: Record<'Manhã' | 'Tarde' | 'Noite', string[]> = {
+  'Manhã': ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00'],
+  'Tarde': ['14:00', '15:00', '16:00', '17:00'],
+  'Noite': ['18:00', '19:00', '20:00', '21:00']
+};
+
 export const BookingModal: React.FC<BookingModalProps> = ({
   isOpen,
   onClose,
@@ -38,9 +45,30 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     return tomorrow.toISOString().split('T')[0];
   });
   const [turnoPreferencia, setTurnoPreferencia] = useState<'Manhã' | 'Tarde' | 'Noite'>('Manhã');
+  const [horario, setHorario] = useState<string>('');
   const [observacoes, setObservacoes] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [submittedLead, setSubmittedLead] = useState<LeadAgendamento | null>(null);
+  const [lgpdConsent, setLgpdConsent] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+
+  // Obtém a grade dinâmica de horários configurada no Supabase do treinador
+  const availableHoursConfig = profile.availableHours || DEFAULT_SHIFT_HOURS;
+  const currentShiftHours = availableHoursConfig[turnoPreferencia] || DEFAULT_SHIFT_HOURS[turnoPreferencia] || [];
+
+  // Reseta seleção ao abrir ou trocar de turno
+  React.useEffect(() => {
+    if (isOpen) {
+      setHorario('');
+      setSubmittedLead(null);
+      setLgpdConsent(false);
+    }
+  }, [isOpen]);
+
+  const handleSelectShift = (shift: 'Manhã' | 'Tarde' | 'Noite') => {
+    setTurnoPreferencia(shift);
+    setHorario('');
+  };
 
   // Formatação de telefone brasileiro
   const formatPhone = (val: string) => {
@@ -73,6 +101,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     objetivo: string;
     data_preferencia: string;
     turno_preferencia: string;
+    horario?: string;
     observacoes?: string;
   }) => {
     const trainerPhone = profile.socialLinks.whatsapp.replace(/\D/g, '');
@@ -86,11 +115,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       `📱 *WhatsApp:* ${leadData.whatsapp}`,
       `🎯 *Objetivo:* ${leadData.objetivo}`,
       `📅 *Data Sugerida:* ${dateFormatted}`,
-      `⏰ *Turno Preferido:* ${leadData.turno_preferencia}`,
+      leadData.horario ? `⏰ *Horário:* ${leadData.horario} (${leadData.turno_preferencia})` : `⏰ *Turno:* ${leadData.turno_preferencia}`,
       initialService ? `📦 *Plano de Interesse:* ${initialService}` : '',
       leadData.observacoes ? `📝 *Observação:* ${leadData.observacoes}` : '',
       ``,
-      `Podemos confirmar a disponibilidade de horário?`
+      `Podemos confirmar a disponibilidade desta vaga?`
     ]
       .filter(Boolean)
       .join('\n');
@@ -110,6 +139,14 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       alert('Por favor, informe um WhatsApp válido com DDD.');
       return;
     }
+    if (!horario) {
+      alert('Por favor, selecione um horário disponível.');
+      return;
+    }
+    if (!lgpdConsent) {
+      alert('Por favor, confirme seu consentimento nos termos da LGPD e Política de Privacidade para prosseguir.');
+      return;
+    }
 
     setIsLoading(true);
 
@@ -121,8 +158,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         objetivo,
         data_preferencia: dataPreferencia,
         turno_preferencia: turnoPreferencia,
+        horario: horario,
         observacoes: observacoes.trim(),
-        plano_interesse: initialService || 'Avaliação Inicial'
+        plano_interesse: initialService || 'Avaliação Inicial',
+        consentimento_lgpd: true
       });
 
       triggerConfetti();
@@ -139,6 +178,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           objetivo,
           data_preferencia: dataPreferencia,
           turno_preferencia: turnoPreferencia,
+          horario: horario,
           observacoes,
           status: 'Novo Lead'
         });
@@ -152,6 +192,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           objetivo,
           data_preferencia: dataPreferencia,
           turno_preferencia: turnoPreferencia,
+          horario: horario,
           observacoes
         });
         window.open(url, '_blank', 'noopener,noreferrer');
@@ -173,6 +214,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       objetivo: submittedLead.objetivo,
       data_preferencia: submittedLead.data_preferencia,
       turno_preferencia: submittedLead.turno_preferencia,
+      horario: submittedLead.horario,
       observacoes: submittedLead.observacoes
     });
     window.open(url, '_blank', 'noopener,noreferrer');
@@ -228,7 +270,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 <div className="mt-6 p-4 rounded-2xl bg-white/5 border border-white/10 text-left text-xs space-y-1.5 text-slate-300">
                   <div><strong className="text-white">Aluno(a):</strong> {submittedLead.nome}</div>
                   <div><strong className="text-white">Objetivo:</strong> {submittedLead.objetivo}</div>
-                  <div><strong className="text-white">Preferência:</strong> {submittedLead.data_preferencia} ({submittedLead.turno_preferencia})</div>
+                  <div>
+                    <strong className="text-white">Agendamento:</strong> {submittedLead.data_preferencia.split('-').reverse().join('/')} às <span className="text-brand-400 font-bold font-mono">{submittedLead.horario || '08:00'}</span> ({submittedLead.turno_preferencia})
+                  </div>
                 </div>
 
                 <div className="mt-6 flex flex-col gap-3">
@@ -351,10 +395,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                           <button
                             type="button"
                             key={shift}
-                            onClick={() => setTurnoPreferencia(shift)}
-                            className={`py-2 px-1 text-center rounded-xl text-xs font-bold border transition-all ${
+                            onClick={() => handleSelectShift(shift)}
+                            className={`py-2 px-1 text-center rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                               turnoPreferencia === shift
-                                ? 'bg-brand-500 text-slate-950 border-brand-500'
+                                ? 'bg-brand-500 text-slate-950 border-brand-500 shadow-[0_0_12px_rgba(255,122,0,0.3)]'
                                 : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
                             }`}
                           >
@@ -363,6 +407,53 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                         ))}
                       </div>
                     </div>
+                  </div>
+
+                  {/* Seleção Obrigatória de Horário Específico por Turno */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-brand-500" />
+                        Horários Disponíveis no Turno ({turnoPreferencia})
+                      </span>
+                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border transition-all ${
+                        horario
+                          ? 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30'
+                          : 'text-brand-400 bg-brand-500/10 border-brand-500/30 animate-pulse'
+                      }`}>
+                        {horario ? `Horário: ${horario}` : 'Obrigatório'}
+                      </span>
+                    </label>
+
+                    <div className={`grid gap-1.5 ${
+                      currentShiftHours.length === 6 
+                        ? 'grid-cols-3 sm:grid-cols-6' 
+                        : 'grid-cols-2 sm:grid-cols-4'
+                    }`}>
+                      {currentShiftHours.map((h) => {
+                        const isSelected = horario === h;
+                        return (
+                          <button
+                            type="button"
+                            key={h}
+                            onClick={() => setHorario(h)}
+                            className={`py-2.5 px-1.5 text-center rounded-xl text-xs font-mono font-bold border transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-brand-500 text-slate-950 border-brand-400 shadow-[0_0_15px_rgba(255,122,0,0.45)] scale-[1.03] ring-2 ring-brand-400/50 font-black'
+                                : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:border-white/20 hover:text-white'
+                            }`}
+                          >
+                            {h}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {!horario && (
+                      <p className="text-[11px] text-amber-400/90 mt-1.5 flex items-center gap-1 font-medium">
+                        <span>⚠️ Selecione um dos horários acima para reservar.</span>
+                      </p>
+                    )}
                   </div>
 
                   {/* Observações Opcionais */}
@@ -379,17 +470,49 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     />
                   </div>
 
+                  {/* Conformidade Obrigatória com a LGPD */}
+                  <div className="pt-1">
+                    <label className="flex items-start gap-2.5 p-3 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-brand-500/40 transition-colors cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        required
+                        checked={lgpdConsent}
+                        onChange={(e) => setLgpdConsent(e.target.checked)}
+                        className="mt-0.5 w-4 h-4 rounded border-white/20 text-brand-500 focus:ring-brand-500 bg-white/5 cursor-pointer accent-[#FF7A00]"
+                      />
+                      <span className="text-[11px] text-slate-300 leading-snug">
+                        Concordo em compartilhar meus dados de contato e objetivos físicos exclusivamente para atendimento e agendamento com o treinador, nos termos da{' '}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setShowPrivacyModal(true);
+                          }}
+                          className="text-brand-400 hover:text-brand-300 underline font-semibold transition-colors inline"
+                        >
+                          Política de Privacidade
+                        </button>
+                        .
+                      </span>
+                    </label>
+                  </div>
+
                   {/* Botão de Envio de Alta Conversão */}
                   <button
                     type="submit"
-                    disabled={isLoading}
-                    className="w-full mt-2 py-3.5 px-6 rounded-xl bg-gradient-to-r from-brand-500 to-amber-500 hover:from-brand-600 hover:to-amber-600 text-slate-950 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_8px_25px_rgba(255,122,0,0.35)] transition-all cursor-pointer disabled:opacity-50"
+                    disabled={isLoading || !horario || !lgpdConsent}
+                    className="w-full mt-2 py-3.5 px-6 rounded-xl bg-gradient-to-r from-brand-500 to-amber-500 hover:from-brand-600 hover:to-amber-600 text-slate-950 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_8px_25px_rgba(255,122,0,0.35)] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isLoading ? (
                       <>
                         <Loader2 className="w-5 h-5 animate-spin" />
                         <span>Salvando Agendamento...</span>
                       </>
+                    ) : !horario ? (
+                      <span>Selecione um Horário Acima</span>
+                    ) : !lgpdConsent ? (
+                      <span>Aceite os Termos da LGPD para Continuar</span>
                     ) : (
                       <>
                         <span>Confirmar & Abrir no WhatsApp</span>
@@ -403,6 +526,13 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           </motion.div>
         </div>
       )}
+
+      {/* Modal Secundário de Política de Privacidade (LGPD) */}
+      <PrivacyPolicyModal
+        isOpen={showPrivacyModal}
+        onClose={() => setShowPrivacyModal(false)}
+        profile={profile}
+      />
     </AnimatePresence>
   );
 };

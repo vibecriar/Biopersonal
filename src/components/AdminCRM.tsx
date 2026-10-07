@@ -7,7 +7,8 @@ import {
   RefreshCw, 
   Plus, 
   Search, 
-  CheckCircle, 
+  CheckCircle,
+  CheckCircle2, 
   Clock, 
   Calendar, 
   CalendarDays,
@@ -43,12 +44,15 @@ import {
 import { exportLeadsToVCard, exportLeadsToCSV } from '../lib/vcard';
 import { ReactivationTemplatesModal } from './ReactivationTemplatesModal';
 import { StudentPlanEditModal } from './StudentPlanEditModal';
-import { ScheduleView } from './ScheduleView';
+import { ScheduleView, getEffectiveLeadHour } from './ScheduleView';
+import { TrainerProfileEditModal } from './TrainerProfileEditModal';
+import { updateTrainer } from '../lib/supabase';
 
 interface AdminCRMProps {
   profile: ProfileConfig;
   onExit: () => void;
   onShowToast: (msg: string) => void;
+  onUpdateProfile?: (updates: Partial<ProfileConfig>) => Promise<boolean>;
 }
 
 const STATUS_COLUMNS: Array<{ id: LeadStatus; label: string; shortLabel: string; color: string; badge: string }> = [
@@ -61,7 +65,8 @@ const STATUS_COLUMNS: Array<{ id: LeadStatus; label: string; shortLabel: string;
 export const AdminCRM: React.FC<AdminCRMProps> = ({
   profile,
   onExit,
-  onShowToast
+  onShowToast,
+  onUpdateProfile
 }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pinInput, setPinInput] = useState('');
@@ -76,8 +81,10 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
   const [filterGoal, setFilterGoal] = useState<string>('all');
   const [filterOnlyUrgent, setFilterOnlyUrgent] = useState(false);
 
-  // Mobile Tabs
+  // Mobile Tabs & Drag and Drop State
   const [activeMobileTab, setActiveMobileTab] = useState<LeadStatus>('Novo Lead');
+  const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<LeadStatus | null>(null);
   const kanbanScrollRef = useRef<HTMLDivElement>(null);
 
   // Meta Mensal Editável
@@ -90,10 +97,19 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
 
   // Modais
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [selectedLeadForTemplates, setSelectedLeadForTemplates] = useState<LeadAgendamento | null>(null);
   const [leadForPlanEdit, setLeadForPlanEdit] = useState<LeadAgendamento | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
+
+  const handleSaveProfile = async (updates: Partial<ProfileConfig>): Promise<boolean> => {
+    if (onUpdateProfile) {
+      return await onUpdateProfile(updates);
+    }
+    const res = await updateTrainer(profile.id || 'default', updates);
+    return res.success;
+  };
 
   // Campos para novo lead manual
   const [newNome, setNewNome] = useState('');
@@ -207,7 +223,8 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
     } else if (lead.status === 'Contato Feito') {
       msg = `Olá, ${firstName}! Aqui é o ${trainerName}. Passando para saber se conseguiu dar uma olhada na proposta que conversamos e se ficou alguma dúvida sobre os treinos!`;
     } else if (lead.status === 'Avaliação Agendada') {
-      msg = `Fala, ${firstName}! Tudo certo para nossa avaliação no dia ${dateFormatted} (${lead.turno_preferencia})? Me confirme aqui para eu reservar seu horário na agenda!`;
+      const hour = getEffectiveLeadHour(lead);
+      msg = `Fala, ${firstName}! Tudo certo para nossa avaliação no dia ${dateFormatted} às ${hour} (${lead.turno_preferencia})? Me confirme aqui para eu reservar seu horário na agenda!`;
     } else if (lead.status === 'Convertido') {
       const renewal = getRenewalAlert(lead);
       if (renewal && renewal.isExpired) {
@@ -438,6 +455,16 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
             title="Recarregar dados"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
+
+          <button
+            onClick={() => setShowProfileModal(true)}
+            className="min-h-[44px] flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 font-bold text-xs border border-white/10 transition-all cursor-pointer"
+            title="Configurações do Perfil, Mídias, Planos e Horários de Agendamento"
+          >
+            <SlidersHorizontal className="w-4 h-4 text-brand-400" />
+            <span className="hidden sm:inline">Perfil & Horários</span>
+            <span className="sm:hidden">Perfil</span>
           </button>
 
           <button
@@ -739,6 +766,11 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
               if (hour) setNewHorario(hour);
               setShowAddModal(true);
             }}
+            onStatusChange={handleStatusChange}
+            onUpdateLeadBooking={async (id, updates) => {
+              await handleSavePlanUpdates(id, updates);
+              onShowToast('Agendamento remanejado e confirmado na grade!');
+            }}
             onShowToast={onShowToast}
           />
         ) : viewMode === 'kanban' ? (
@@ -749,11 +781,37 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
           >
             {STATUS_COLUMNS.map((col) => {
               const columnLeads = filteredLeads.filter(l => l.status === col.id);
+              const isOver = dragOverColumn === col.id;
 
               return (
                 <div
                   key={col.id}
-                  className="w-[88vw] sm:w-[340px] md:w-auto shrink-0 md:shrink rounded-2xl glass-card p-3 sm:p-4 border border-white/10 flex flex-col min-h-[500px] snap-center"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (dragOverColumn !== col.id) {
+                      setDragOverColumn(col.id);
+                    }
+                  }}
+                  onDragLeave={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                      setDragOverColumn(null);
+                    }
+                  }}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    const droppedId = e.dataTransfer.getData('text/plain') || draggedLeadId;
+                    setDragOverColumn(null);
+                    setDraggedLeadId(null);
+                    if (droppedId) {
+                      await handleStatusChange(droppedId, col.id);
+                    }
+                  }}
+                  className={`w-[88vw] sm:w-[340px] md:w-auto shrink-0 md:shrink rounded-2xl glass-card p-3 sm:p-4 border transition-all flex flex-col min-h-[500px] snap-center ${
+                    isOver
+                      ? 'border-brand-500 bg-brand-500/10 ring-2 ring-brand-500/40 shadow-[0_0_25px_rgba(255,122,0,0.2)] scale-[1.01]'
+                      : 'border-white/10'
+                  }`}
                 >
                   {/* Cabeçalho da Coluna */}
                   <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
@@ -776,11 +834,24 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
                       columnLeads.map((lead) => {
                         const forgottenAlert = getForgottenLeadAlert(lead);
                         const renewalAlert = getRenewalAlert(lead);
+                        const isDragging = draggedLeadId === lead.id;
 
                         return (
                           <div
                             key={lead.id}
-                            className={`p-3.5 rounded-2xl bg-white/5 border transition-all shadow-md group relative ${
+                            draggable
+                            onDragStart={(e) => {
+                              setDraggedLeadId(lead.id);
+                              e.dataTransfer.setData('text/plain', lead.id);
+                              e.dataTransfer.effectAllowed = 'move';
+                            }}
+                            onDragEnd={() => {
+                              setDraggedLeadId(null);
+                              setDragOverColumn(null);
+                            }}
+                            className={`p-3.5 rounded-2xl bg-white/5 border transition-all shadow-md group relative cursor-grab active:cursor-grabbing ${
+                              isDragging ? 'opacity-40 scale-95 border-brand-500' : ''
+                            } ${
                               forgottenAlert
                                 ? 'border-rose-500/40 hover:border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.15)]'
                                 : renewalAlert && renewalAlert.isNearExpiration
@@ -871,7 +942,10 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
                                   </span>
                                   <span className="flex items-center gap-1">
                                     <Clock className="w-3 h-3 text-slate-500" />
-                                    {lead.turno_preferencia}
+                                    <strong className="text-brand-400 font-mono font-bold">
+                                      {getEffectiveLeadHour(lead)}
+                                    </strong>
+                                    <span className="text-slate-500 font-normal">({lead.turno_preferencia})</span>
                                   </span>
                                 </>
                               )}
@@ -881,6 +955,20 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
                               <p className="text-[10px] text-slate-400 italic bg-black/30 p-2 rounded-lg mb-3 line-clamp-2">
                                 "{lead.observacoes}"
                               </p>
+                            )}
+
+                            {/* Botão de Confirmação Rápida para Novos Leads */}
+                            {lead.status === 'Novo Lead' && (
+                              <div className="mb-2">
+                                <button
+                                  onClick={() => handleStatusChange(lead.id, 'Avaliação Agendada')}
+                                  className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-brand-500 to-amber-500 hover:from-brand-600 hover:to-amber-600 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-md shadow-brand-500/25 transition-all cursor-pointer"
+                                  title="Confirmar vaga e mover para Avaliação Agendada"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                  <span>Confirmar Vaga na Grade</span>
+                                </button>
+                              </div>
                             )}
 
                             {/* 1. BOTÃO INTELIGENTE DE WHATSAPP (com mensagem pré-formatada específica para o estágio) */}
@@ -993,7 +1081,7 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
                             </div>
                           ) : (
                             <div className="text-slate-300">
-                              {lead.data_preferencia ? lead.data_preferencia.split('-').reverse().join('/') : '-'} ({lead.turno_preferencia})
+                              {lead.data_preferencia ? lead.data_preferencia.split('-').reverse().join('/') : '-'} <strong className="text-brand-400 font-mono">às {getEffectiveLeadHour(lead)}</strong> <span className="text-slate-400">({lead.turno_preferencia})</span>
                             </div>
                           )}
                         </td>
@@ -1189,6 +1277,15 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
         onClose={() => setLeadForPlanEdit(null)}
         lead={leadForPlanEdit}
         onSave={handleSavePlanUpdates}
+        onShowToast={onShowToast}
+      />
+
+      {/* Modal: Editar Perfil e Horários do Treinador */}
+      <TrainerProfileEditModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        profile={profile}
+        onSaveProfile={handleSaveProfile}
         onShowToast={onShowToast}
       />
     </div>

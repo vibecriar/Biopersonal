@@ -174,5 +174,12 @@ export const profileConfig: ProfileConfig = {
     email: "contato@rodrigosilveirafit.com.br",
     url: "https://rodrigosilveirafit.com.br",
     note: "Personal Trainer de Alta Performance. Agendamentos de aulas e consultoria física."
+  },
+
+  // Horários disponíveis por turno (grade padrão editável)
+  availableHours: {
+    'Manhã': ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00'],
+    'Tarde': ['14:00', '15:00', '16:00', '17:00'],
+    'Noite': ['18:00', '19:00', '20:00', '21:00']
   }
 };

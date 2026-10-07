@@ -82,6 +82,7 @@ export interface ProfileConfig {
   services: ServicePlan[];
   socialProof: SocialProofData;
   vCardData: VCardData;
+  availableHours?: Record<'Manhã' | 'Tarde' | 'Noite', string[]>;
 }
 
 export type LeadStatus = 'Novo Lead' | 'Contato Feito' | 'Avaliação Agendada' | 'Convertido';
@@ -110,5 +111,8 @@ export interface LeadAgendamento {
   // Campos de Agenda de Atendimentos
   horario?: string; // Ex: "07:00", "08:00", "18:00"
   tipo_atendimento?: 'Presencial' | 'Online' | 'Avaliação';
+
+  // Conformidade LGPD
+  consentimento_lgpd?: boolean;
 }
 
