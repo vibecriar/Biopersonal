@@ -91,8 +91,8 @@ function AppContent() {
         <div className="absolute inset-0 bg-gradient-to-b from-[#08090C]/85 via-[#08090C]/90 to-[#08090C] backdrop-blur-[6px]" />
       </div>
 
-      {/* Container Centralizado para Mobile First & Conversão Máxima */}
-      <div className="relative z-10 w-full max-w-lg mx-auto flex-1 flex flex-col justify-between pb-8">
+      {/* Container Centralizado Responsivo (Mobile, Tablet & Desktop) */}
+      <div className="relative z-10 w-full max-w-md sm:max-w-xl md:max-w-2xl mx-auto flex-1 flex flex-col justify-between pb-8">
         <div>
           {/* 1. Header Hero com foto, anel pulsante e bio */}
           <HeaderHero profile={profile} />
@@ -131,7 +131,7 @@ function AppContent() {
         </div>
 
         {/* Rodapé / Footer com Links Sociais Sutis e Termos LGPD */}
-        <footer className="w-full max-w-md mx-auto px-4 mt-6 pt-6 border-t border-white/10 text-center">
+        <footer className="w-full max-w-md sm:max-w-xl md:max-w-2xl mx-auto px-4 mt-6 pt-6 border-t border-white/10 text-center">
           <div className="flex items-center justify-center gap-3 mb-2">
             {profile.socialLinks?.instagram && (
               <a

@@ -29,22 +29,22 @@ const PILLARS = [
 
 export const WhyTrainWithMe: React.FC<WhyTrainWithMeProps> = ({ onOpenBooking }) => {
   return (
-    <section className="w-full max-w-md mx-auto px-4 mt-5 mb-6">
+    <section className="w-full max-w-md sm:max-w-xl md:max-w-2xl mx-auto px-4 mt-5 mb-6">
       {/* Container Principal Vitrificado */}
-      <div className="relative rounded-3xl glass-card p-5 sm:p-6 border border-white/15 overflow-hidden">
+      <div className="relative rounded-2xl sm:rounded-3xl glass-card p-5 sm:p-7 border border-white/15 overflow-hidden">
         {/* Glow de fundo */}
-        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-40 h-40 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-44 h-44 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Cabeçalho da Seção */}
-        <div className="text-center mb-5">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-500/15 border border-brand-500/30 text-brand-400 text-[11px] font-bold uppercase tracking-wider mb-2">
+        <div className="text-center mb-5 sm:mb-6">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-500/15 border border-brand-500/30 text-brand-400 text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-2">
             <CheckCircle2 className="w-3.5 h-3.5 text-brand-400" />
             Método Comprovado
           </span>
-          <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tight">
             Por que treinar comigo?
           </h2>
-          <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+          <p className="text-xs sm:text-sm text-slate-400 mt-1.5 max-w-sm sm:max-w-md mx-auto">
             Elimine as dúvidas e alcance resultados sem perder tempo com o que não funciona.
           </p>
         </div>

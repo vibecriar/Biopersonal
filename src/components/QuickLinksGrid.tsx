@@ -29,18 +29,18 @@ export const QuickLinksGrid: React.FC<QuickLinksGridProps> = ({
   };
 
   return (
-    <section className="w-full max-w-md mx-auto px-4 mt-2 mb-3">
+    <section className="w-full max-w-md sm:max-w-xl md:max-w-2xl mx-auto px-4 mt-2 mb-3">
       {/* Título de seção sutil */}
       <div className="flex items-center justify-between mb-2.5 px-1">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+        <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
           <Sparkles className="w-3.5 h-3.5 text-brand-500" />
           Ações Rápidas
         </span>
-        <span className="text-[11px] text-slate-500">Escolha o melhor canal</span>
+        <span className="text-[11px] sm:text-xs text-slate-500">Escolha o melhor canal</span>
       </div>
 
       {/* Grade 2 Colunas Glassmorphism */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-3.5">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         {/* Card 1: WhatsApp Direto */}
         <motion.button
           onClick={handleWhatsAppClick}
