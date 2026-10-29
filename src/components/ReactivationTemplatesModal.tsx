@@ -50,7 +50,34 @@ export const ReactivationTemplatesModal: React.FC<ReactivationTemplatesModalProp
       tag: '⚡ Retenção de Alunos',
       title: 'Lembrete Amigável de Renovação',
       desc: 'Para alunos com plano prestes a vencer para manter a constância e os resultados.',
-      text: `Fala, ${leadName}! Seu ciclo atual de consultoria está chegando ao fim. Para mantermos sua periodização sem nenhuma quebra e continuarmos acelerando seus resultados, já vamos deixar o próximo mês alinhado?`
+      text: `Fala, ${leadName}! Seu ciclo atual de consultoria está chegando ao fim. Para mantermos sua periodização sem nenhuma quebra e continuarmos acelerando seus resultados, já vamos deixar o próximo mês alinhado? ${
+        selectedLead?.payment_method === 'Pix'
+          ? 'Posso te enviar a chave Pix para acertarmos?'
+          : selectedLead?.payment_method === 'Cartão / Recorrência'
+          ? 'Posso te enviar o link seguro de renovação no cartão?'
+          : selectedLead?.payment_method === 'Boleto'
+          ? 'Já posso emitir o seu boleto de renovação?'
+          : selectedLead?.payment_method === 'Dinheiro'
+          ? 'Podemos acertar na nossa próxima sessão presencial?'
+          : ''
+      }`.trim()
+    },
+    {
+      id: 'cobranca-forma-pagamento',
+      tag: '💳 Cobrança com Forma de Pagamento',
+      title: 'Cobrança Personalizada de Vencimento',
+      desc: 'Utiliza dinamicamente a forma de pagamento combinada com o aluno (Pix, Cartão, Boleto ou Dinheiro).',
+      text: `Olá, ${leadName}! Tudo bem? Passando para lembrar da renovação do seu plano de treinos. ${
+        selectedLead?.payment_method === 'Pix'
+          ? 'Como seu pagamento é via Pix, já deixo a chave separada para te enviar e confirmarmos seu novo ciclo.'
+          : selectedLead?.payment_method === 'Cartão / Recorrência'
+          ? 'Como combinamos no Cartão / Recorrência, já posso te gerar o link seguro para renovação imediata.'
+          : selectedLead?.payment_method === 'Boleto'
+          ? 'Como sua opção é Boleto bancário, já posso emitir a fatura com o código de barras para você.'
+          : selectedLead?.payment_method === 'Dinheiro'
+          ? 'Como alinhamos em Dinheiro, combinamos o acerto presencialmente na nossa próxima aula.'
+          : 'Podemos alinhar a forma de pagamento (Pix, Cartão ou Boleto) para mantermos seu acompanhamento sem pausas?'
+      } Bora continuar evoluindo juntos!`
     }
   ];
 
@@ -105,8 +132,13 @@ export const ReactivationTemplatesModal: React.FC<ReactivationTemplatesModalProp
                 Copie e dispare para suas Listas de Transmissão no WhatsApp ou envie diretamente para um lead selecionado.
               </p>
               {selectedLead && (
-                <div className="mt-2 text-xs font-semibold text-brand-300 bg-brand-500/10 border border-brand-500/30 px-3 py-1.5 rounded-xl inline-flex items-center gap-1.5">
+                <div className="mt-2 text-xs font-semibold text-brand-300 bg-brand-500/10 border border-brand-500/30 px-3 py-1.5 rounded-xl inline-flex flex-wrap items-center gap-1.5">
                   <span>Lead selecionado: <strong>{selectedLead.nome}</strong> ({selectedLead.objetivo})</span>
+                  {selectedLead.payment_method && (
+                    <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold">
+                      💳 {selectedLead.payment_method}
+                    </span>
+                  )}
                 </div>
               )}
             </div>

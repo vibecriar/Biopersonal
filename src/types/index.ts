@@ -87,6 +87,7 @@ export interface ProfileConfig {
 
 export type LeadStatus = 'Novo Lead' | 'Contato Feito' | 'Avaliação Agendada' | 'Convertido';
 export type PlanDuration = 'Mensal' | 'Trimestral' | 'Semestral';
+export type PaymentMethod = 'Pix' | 'Cartão / Recorrência' | 'Boleto' | 'Dinheiro';
 
 export interface LeadAgendamento {
   id: string;
@@ -107,6 +108,7 @@ export interface LeadAgendamento {
   plano_valor?: number;
   data_inicio?: string;
   data_vencimento?: string;
+  payment_method?: PaymentMethod;
 
   // Campos de Agenda de Atendimentos
   horario?: string; // Ex: "07:00", "08:00", "18:00"

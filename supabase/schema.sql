@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS public.leads_agendamentos (
     plano_valor NUMERIC DEFAULT 0,
     data_inicio DATE,
     data_vencimento DATE,
+    payment_method TEXT DEFAULT 'Pix',
 
     -- Agenda de Atendimentos
     horario TEXT,
@@ -87,6 +88,9 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'leads_agendamentos' AND column_name = 'consentimento_lgpd') THEN
         ALTER TABLE public.leads_agendamentos ADD COLUMN consentimento_lgpd BOOLEAN DEFAULT true;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'leads_agendamentos' AND column_name = 'payment_method') THEN
+        ALTER TABLE public.leads_agendamentos ADD COLUMN payment_method TEXT DEFAULT 'Pix';
     END IF;
 END $$;
 

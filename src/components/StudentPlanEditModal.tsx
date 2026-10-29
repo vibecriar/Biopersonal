@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, DollarSign, Dumbbell, Clock, Check, Sparkles } from 'lucide-react';
-import { LeadAgendamento, PlanDuration } from '../types';
+import { X, Calendar, DollarSign, Dumbbell, Clock, Check, Sparkles, CreditCard } from 'lucide-react';
+import { LeadAgendamento, PlanDuration, PaymentMethod } from '../types';
+
+const PAYMENT_METHODS: PaymentMethod[] = ['Pix', 'Cartão / Recorrência', 'Boleto', 'Dinheiro'];
 
 interface StudentPlanEditModalProps {
   isOpen: boolean;
@@ -23,6 +25,7 @@ export const StudentPlanEditModal: React.FC<StudentPlanEditModalProps> = ({
   const [planoInteresse, setPlanoInteresse] = useState(lead.plano_interesse || 'Consultoria Online Black');
   const [planoTipo, setPlanoTipo] = useState<PlanDuration>(lead.plano_tipo || 'Mensal');
   const [planoValor, setPlanoValor] = useState<number>(lead.plano_valor || 197);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(lead.payment_method || 'Pix');
   const [dataInicio, setDataInicio] = useState(
     lead.data_inicio || lead.data_preferencia || new Date().toISOString().split('T')[0]
   );
@@ -67,6 +70,7 @@ export const StudentPlanEditModal: React.FC<StudentPlanEditModalProps> = ({
         plano_interesse: planoInteresse,
         plano_tipo: planoTipo,
         plano_valor: Number(planoValor) || 0,
+        payment_method: paymentMethod,
         data_inicio: dataInicio,
         data_vencimento: dataVencimento
       });
@@ -169,6 +173,33 @@ export const StudentPlanEditModal: React.FC<StudentPlanEditModalProps> = ({
                   onChange={(e) => setPlanoValor(Number(e.target.value))}
                   className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-bold text-brand-400"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1">
+                  <CreditCard className="w-3.5 h-3.5 text-brand-400" />
+                  Forma de Pagamento
+                </label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {PAYMENT_METHODS.map((method) => {
+                    const isSelected = paymentMethod === method;
+                    return (
+                      <button
+                        type="button"
+                        key={method}
+                        onClick={() => setPaymentMethod(method)}
+                        className={`py-2 px-2.5 rounded-xl text-xs font-bold border transition-all text-center flex items-center justify-center gap-1.5 ${
+                          isSelected
+                            ? 'bg-brand-500 text-slate-950 border-brand-500 shadow-md shadow-brand-500/25'
+                            : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:border-white/20'
+                        }`}
+                      >
+                        {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                        <span>{method}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2.5">

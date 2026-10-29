@@ -65,6 +65,7 @@ export function exportLeadsToCSV(leads: LeadAgendamento[]): void {
     'Status',
     'Plano',
     'Valor (R$)',
+    'Forma de Pagamento',
     'Data Vencimento',
     'Turno Preferido',
     'Data Cadastro'
@@ -77,6 +78,7 @@ export function exportLeadsToCSV(leads: LeadAgendamento[]): void {
     `"${l.status}"`,
     `"${l.plano_interesse || l.plano_tipo || '-'}"`,
     `"${l.plano_valor || 0}"`,
+    `"${l.payment_method || '-'}"`,
     `"${l.data_vencimento || '-'}"`,
     `"${l.turno_preferencia}"`,
     `"${new Date(l.created_at).toLocaleDateString('pt-BR')}"`

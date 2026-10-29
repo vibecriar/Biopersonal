@@ -30,9 +30,10 @@ import {
   Target,
   Send,
   SlidersHorizontal,
-  ChevronDown
+  ChevronDown,
+  X
 } from 'lucide-react';
-import { LeadAgendamento, LeadStatus, ProfileConfig } from '../types';
+import { LeadAgendamento, LeadStatus, ProfileConfig, PaymentMethod } from '../types';
 import { 
   getLeads, 
   updateLeadStatus, 
@@ -80,6 +81,7 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [filterGoal, setFilterGoal] = useState<string>('all');
   const [filterOnlyUrgent, setFilterOnlyUrgent] = useState(false);
+  const [filterExpiringThisWeek, setFilterExpiringThisWeek] = useState(false);
 
   // Mobile Tabs & Drag and Drop State
   const [activeMobileTab, setActiveMobileTab] = useState<LeadStatus>('Novo Lead');
@@ -227,10 +229,22 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
       msg = `Fala, ${firstName}! Tudo certo para nossa avaliação no dia ${dateFormatted} às ${hour} (${lead.turno_preferencia})? Me confirme aqui para eu reservar seu horário na agenda!`;
     } else if (lead.status === 'Convertido') {
       const renewal = getRenewalAlert(lead);
+      const method = lead.payment_method || 'Pix';
+      let paymentSnippet = '';
+      if (method === 'Pix') {
+        paymentSnippet = ' Posso te enviar a chave Pix para acertarmos a renovação?';
+      } else if (method === 'Cartão / Recorrência') {
+        paymentSnippet = ' Posso te gerar o link seguro do cartão para renovar?';
+      } else if (method === 'Boleto') {
+        paymentSnippet = ' Já posso emitir o seu boleto de renovação?';
+      } else if (method === 'Dinheiro') {
+        paymentSnippet = ' Podemos acertar na nossa próxima sessão presencial?';
+      }
+
       if (renewal && renewal.isExpired) {
-        msg = `Olá, ${firstName}! Seu plano de ${planName} venceu há ${Math.abs(renewal.daysLeft)} dias. Vamos renovar hoje para continuarmos firmes na sua evolução?`;
+        msg = `Olá, ${firstName}! Seu plano de ${planName} venceu há ${Math.abs(renewal.daysLeft)} dias.${paymentSnippet} Vamos renovar hoje para continuarmos firmes na sua evolução?`;
       } else if (renewal && renewal.isNearExpiration) {
-        msg = `Olá, ${firstName}! Seu plano de ${planName} vence em ${renewal.daysLeft} dias. Vamos renovar para mantermos o foco nos seus resultados?`;
+        msg = `Olá, ${firstName}! Seu plano de ${planName} vence em ${renewal.daysLeft} dias.${paymentSnippet} Vamos renovar para mantermos o foco nos seus resultados?`;
       } else {
         msg = `Fala, ${firstName}! Como estão os treinos dessa semana? Passando para checar se está tudo bem com sua planilha e cargas!`;
       }
@@ -257,6 +271,23 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
       };
     }
     return null;
+  };
+
+  // Helper para calcular dias restantes até o vencimento exato
+  const getDaysToDue = (lead: LeadAgendamento): number | null => {
+    if (lead.status !== 'Convertido' || !lead.data_vencimento) return null;
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const venc = new Date(lead.data_vencimento + 'T00:00:00');
+    if (isNaN(venc.getTime())) return null;
+    return Math.round((venc.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  // Identifica alunos com vencimento entre a data atual e os próximos 7 dias
+  const isExpiringThisWeek = (lead: LeadAgendamento): boolean => {
+    const diffDays = getDaysToDue(lead);
+    if (diffDays === null) return false;
+    return diffDays >= 0 && diffDays <= 7;
   };
 
   // Alerta de Renovação para Alunos Convertidos
@@ -298,7 +329,8 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
         l.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
         l.whatsapp.includes(searchQuery) ||
         l.objetivo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (l.plano_interesse && l.plano_interesse.toLowerCase().includes(searchQuery.toLowerCase()));
+        (l.plano_interesse && l.plano_interesse.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (l.payment_method && l.payment_method.toLowerCase().includes(searchQuery.toLowerCase()));
 
       // Filtro por objetivo
       const matchesGoal = filterGoal === 'all' || l.objetivo === filterGoal;
@@ -311,9 +343,15 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
         matchesUrgent = Boolean(forgotten || (renewal && renewal.isNearExpiration));
       }
 
-      return matchesSearch && matchesGoal && matchesUrgent;
+      // Filtro Rápido: Vencendo Nesta Semana (0 a 7 dias)
+      let matchesExpiringThisWeek = true;
+      if (filterExpiringThisWeek) {
+        matchesExpiringThisWeek = isExpiringThisWeek(l);
+      }
+
+      return matchesSearch && matchesGoal && matchesUrgent && matchesExpiringThisWeek;
     });
-  }, [leads, searchQuery, filterGoal, filterOnlyUrgent]);
+  }, [leads, searchQuery, filterGoal, filterOnlyUrgent, filterExpiringThisWeek]);
 
   /* -------------------------------------------------------------
    * 4. MINI METRO DE FATURAMENTO & MÉTRICAS
@@ -322,6 +360,11 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
   const countNovos = leads.filter(l => l.status === 'Novo Lead').length;
   const countAgendados = leads.filter(l => l.status === 'Avaliação Agendada').length;
   const countConvertidos = leads.filter(l => l.status === 'Convertido').length;
+
+  // Contagem de alunos com vencimento nos próximos 7 dias
+  const countExpiringThisWeek = useMemo(() => {
+    return leads.filter(isExpiringThisWeek).length;
+  }, [leads]);
   
   // Total faturado no mês (soma dos valores dos alunos convertidos ativos)
   const currentBilled = useMemo(() => {
@@ -560,27 +603,39 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
           </div>
         </div>
 
-        {/* Card 3: Alunos Ativos & Renovações */}
-        <div className="p-4 rounded-2xl glass-card border border-white/10 flex flex-col justify-between">
+        {/* Card 3: Alunos Ativos & Renovações (Interativo para Filtro Rápido) */}
+        <div
+          onClick={() => setFilterExpiringThisWeek(prev => !prev)}
+          className={`p-4 rounded-2xl glass-card border transition-all flex flex-col justify-between cursor-pointer select-none group relative overflow-hidden ${
+            filterExpiringThisWeek
+              ? 'border-amber-500 bg-amber-500/10 ring-2 ring-amber-500/40 shadow-[0_0_25px_rgba(245,158,11,0.2)]'
+              : 'border-white/10 hover:border-amber-500/40 hover:bg-white/[0.06]'
+          }`}
+          title={filterExpiringThisWeek ? "Filtro ativo: Clique para limpar" : "Clique para filtrar alunos a vencer nos próximos 7 dias"}
+        >
           <div className="text-xs font-semibold text-emerald-400 flex items-center justify-between">
-            <span>Alunos Ativos</span>
-            <CreditCard className="w-4 h-4 text-emerald-400/80" />
+            <span className="flex items-center gap-1.5">
+              <span>Alunos Ativos</span>
+              {filterExpiringThisWeek && (
+                <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
+                  Filtro Ativo
+                </span>
+              )}
+            </span>
+            <CreditCard className="w-4 h-4 text-emerald-400/80 group-hover:text-amber-400 transition-colors" />
           </div>
           <div className="text-2xl sm:text-3xl font-black text-emerald-300 mt-1">{countConvertidos}</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">
-            {leads.filter(l => {
-              const ren = getRenewalAlert(l);
-              return ren && ren.isNearExpiration;
-            }).length > 0 ? (
-              <span className="text-amber-400 font-bold">
-                ⚡ {leads.filter(l => {
-                  const ren = getRenewalAlert(l);
-                  return ren && ren.isNearExpiration;
-                }).length} vencendo nesta semana
+          <div className="text-[10px] text-slate-400 mt-0.5 flex items-center justify-between">
+            {countExpiringThisWeek > 0 ? (
+              <span className={`font-bold transition-colors ${filterExpiringThisWeek ? 'text-amber-300 underline underline-offset-2' : 'text-amber-400 group-hover:text-amber-300'}`}>
+                ⚡ {countExpiringThisWeek} vencendo nesta semana
               </span>
             ) : (
               'Planos em dia'
             )}
+            <span className="text-[9px] text-slate-500 group-hover:text-slate-300 transition-colors font-medium">
+              {filterExpiringThisWeek ? '✕ Limpar' : 'Filtrar →'}
+            </span>
           </div>
         </div>
       </section>
@@ -625,6 +680,21 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
             >
               <AlertTriangle className={`w-3.5 h-3.5 ${filterOnlyUrgent ? 'text-rose-400' : 'text-amber-400'}`} />
               <span>Apenas Urgentes / Alertas</span>
+            </button>
+
+            {/* Toggle Rápido: Vencendo Nesta Semana */}
+            <button
+              onClick={() => setFilterExpiringThisWeek(!filterExpiringThisWeek)}
+              className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border ${
+                filterExpiringThisWeek
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-md shadow-amber-950'
+                  : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
+              }`}
+              title="Filtrar alunos com vencimento nos próximos 7 dias"
+            >
+              <Clock className={`w-3.5 h-3.5 ${filterExpiringThisWeek ? 'text-amber-400' : 'text-slate-400'}`} />
+              <span>A Vencer Esta Semana ({countExpiringThisWeek})</span>
+              {filterExpiringThisWeek && <X className="w-3 h-3 text-amber-300 hover:text-white ml-0.5" />}
             </button>
           </div>
 
@@ -724,6 +794,24 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Banner Informativo de Filtro Ativo */}
+        {filterExpiringThisWeek && (
+          <div className="flex items-center justify-between p-2.5 px-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs">
+            <span className="flex items-center gap-2 font-medium">
+              <span className="flex h-2 w-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+              <span>
+                Filtro ativo: exibindo apenas alunos com plano a vencer entre hoje e os próximos 7 dias (<strong>{filteredLeads.length}</strong> encontrados).
+              </span>
+            </span>
+            <button
+              onClick={() => setFilterExpiringThisWeek(false)}
+              className="text-xs font-bold text-amber-300 hover:text-white underline cursor-pointer transition-colors shrink-0 ml-2"
+            >
+              Limpar filtro
+            </button>
+          </div>
+        )}
       </section>
 
       {/* 5. OTIMIZAÇÃO MOBILE-FIRST: ABAS SUPERIORES DESLIZANTES (Apenas no Kanban) */}
@@ -925,6 +1013,15 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
                                   {lead.plano_tipo} (R$ {lead.plano_valor || 0})
                                 </span>
                               )}
+                              {lead.status === 'Convertido' && (
+                                <span 
+                                  className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-300/90 border border-amber-500/25 flex items-center gap-1"
+                                  title={`Forma de Pagamento: ${lead.payment_method || 'Pix'}`}
+                                >
+                                  <CreditCard className="w-2.5 h-2.5 text-amber-400" />
+                                  <span>{lead.payment_method || 'Pix'}</span>
+                                </span>
+                              )}
                             </div>
 
                             {/* Detalhes de Data / Vencimento */}
@@ -1063,9 +1160,19 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
                         </td>
                         <td className="p-3.5">
                           <div className="font-semibold text-white">{lead.plano_interesse || '-'}</div>
-                          {lead.plano_valor ? (
-                            <div className="text-[10px] text-emerald-400 font-bold">R$ {lead.plano_valor}</div>
-                          ) : null}
+                          <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                            {lead.plano_valor ? (
+                              <span className="text-[10px] text-emerald-400 font-bold">
+                                R$ {lead.plano_valor} {lead.plano_tipo ? `(${lead.plano_tipo})` : ''}
+                              </span>
+                            ) : null}
+                            {lead.status === 'Convertido' && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/10 text-amber-300 border border-white/10 flex items-center gap-1">
+                                <CreditCard className="w-2.5 h-2.5 text-amber-400" />
+                                <span>{lead.payment_method || 'Pix'}</span>
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="p-3.5">
                           {lead.status === 'Convertido' && lead.data_vencimento ? (

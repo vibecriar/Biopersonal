@@ -92,6 +92,7 @@ const INITIAL_MOCK_LEADS: LeadAgendamento[] = [
     plano_interesse: 'Personal Presencial VIP',
     plano_tipo: 'Mensal',
     plano_valor: 1200,
+    payment_method: 'Cartão / Recorrência',
     data_inicio: formatDateStr(now - dayMs * 10),
     data_vencimento: formatDateStr(now + dayMs * 20)
   },
@@ -141,6 +142,7 @@ const INITIAL_MOCK_LEADS: LeadAgendamento[] = [
     plano_interesse: 'Consultoria Online Black',
     plano_tipo: 'Mensal',
     plano_valor: 197,
+    payment_method: 'Pix',
     data_inicio: formatDateStr(now - dayMs * 27),
     data_vencimento: formatDateStr(now + dayMs * 3) // ALERTA: Vence em 3 dias!
   },
@@ -160,6 +162,7 @@ const INITIAL_MOCK_LEADS: LeadAgendamento[] = [
     plano_interesse: 'Personal Presencial VIP',
     plano_tipo: 'Mensal',
     plano_valor: 1200,
+    payment_method: 'Pix',
     data_inicio: formatDateStr(now - dayMs * 12),
     data_vencimento: formatDateStr(now + dayMs * 18)
   },
@@ -179,6 +182,7 @@ const INITIAL_MOCK_LEADS: LeadAgendamento[] = [
     plano_interesse: 'Desafio 90 Dias Shape',
     plano_tipo: 'Trimestral',
     plano_valor: 497,
+    payment_method: 'Boleto',
     data_inicio: formatDateStr(now - dayMs * 89),
     data_vencimento: formatDateStr(now + dayMs * 1) // ALERTA: Vence amanhã!
   }
@@ -248,6 +252,7 @@ export async function createAgendamento(
         plano_valor: data.plano_valor || 0,
         horario: data.horario || null,
         tipo_atendimento: data.tipo_atendimento || 'Presencial',
+        payment_method: data.payment_method || 'Pix',
         consentimento_lgpd: data.consentimento_lgpd !== false
       };
 
