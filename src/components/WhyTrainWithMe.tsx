@@ -89,7 +89,7 @@ export const WhyTrainWithMe: React.FC<WhyTrainWithMeProps> = ({ onOpenBooking })
             onClick={onOpenBooking}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className="w-full relative overflow-hidden py-4 px-6 rounded-2xl bg-gradient-to-r from-brand-500 via-amber-500 to-brand-600 hover:from-brand-600 hover:to-amber-600 text-slate-950 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2.5 shadow-[0_10px_30px_rgba(255,122,0,0.35)] hover:shadow-[0_12px_40px_rgba(255,122,0,0.5)] transition-all cursor-pointer min-h-[52px] border border-amber-300/40"
+            className="w-full relative overflow-hidden py-4 px-6 rounded-2xl bg-gradient-to-r from-brand-500 via-brand-400 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-slate-950 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2.5 shadow-lg shadow-brand-500/30 transition-all cursor-pointer min-h-[52px] border border-white/20"
           >
             {/* Shimmer de reflexo */}
             <div className="absolute inset-0 -translate-x-full hover:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/25 to-transparent pointer-events-none" />

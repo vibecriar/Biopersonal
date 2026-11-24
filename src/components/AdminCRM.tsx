@@ -38,7 +38,10 @@ import {
   LogOut,
   ExternalLink,
   AlertCircle,
-  UserCheck
+  UserCheck,
+  Globe,
+  Copy,
+  Check
 } from 'lucide-react';
 import { LeadAgendamento, LeadStatus, ProfileConfig, PaymentMethod } from '../types';
 import { 
@@ -147,6 +150,20 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
   const [selectedLeadForTemplates, setSelectedLeadForTemplates] = useState<LeadAgendamento | null>(null);
   const [leadForPlanEdit, setLeadForPlanEdit] = useState<LeadAgendamento | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const publicSlug = activeProfile.slug || activeProfile.id || 'personal';
+  const originUrl = typeof window !== 'undefined' ? window.location.origin : '';
+  const biositePublicUrl = `${originUrl}/p/${publicSlug}`;
+
+  const handleCopyBiositeLink = () => {
+    navigator.clipboard.writeText(biositePublicUrl);
+    setCopiedLink(true);
+    if (onShowToast) {
+      onShowToast('Link do Biosite copiado para a área de transferência!');
+    }
+    setTimeout(() => setCopiedLink(false), 2500);
+  };
 
   const handleSaveProfile = async (updates: Partial<ProfileConfig>): Promise<boolean> => {
     if (onUpdateProfile) {
@@ -568,13 +585,15 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
             </button>
           </form>
 
-          <button
-            onClick={onExit}
-            className="mt-5 min-h-[40px] text-xs text-slate-400 hover:text-white transition-colors flex items-center justify-center gap-1.5 w-full cursor-pointer"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Voltar à Página Principal</span>
-          </button>
+          {activeProfile.slug && (
+            <a
+              href={`/p/${activeProfile.slug}`}
+              className="mt-5 min-h-[38px] text-xs text-slate-400 hover:text-brand-300 transition-colors flex items-center justify-center gap-1.5 w-full cursor-pointer"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Ver Biosite Exemplo ({activeProfile.slug})</span>
+            </a>
+          )}
         </motion.div>
       </div>
     );
@@ -723,6 +742,60 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
           </a>
         </div>
       )}
+
+      {/* CARD DE DIVULGAÇÃO & LINK PÚBLICO DO BIOPERSONAL */}
+      <div className="max-w-7xl mx-auto my-4 p-4 rounded-2xl glass-card border border-brand-500/30 bg-gradient-to-r from-brand-500/10 via-transparent to-white/[0.02] flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-lg shadow-black/40">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-brand-500/20 text-brand-400 border border-brand-500/30 shrink-0">
+            <Globe className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-white uppercase tracking-wider">
+                Link Público do seu Biosite
+              </span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Ativo no Supabase
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 font-mono mt-0.5 break-all">
+              {biositePublicUrl}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <button
+            onClick={handleCopyBiositeLink}
+            className="flex-1 md:flex-none min-h-[42px] px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs flex items-center justify-center gap-2 border border-white/15 transition-all cursor-pointer shadow-sm"
+            title="Copiar link para enviar a novos alunos"
+          >
+            {copiedLink ? (
+              <>
+                <Check className="w-4 h-4 text-emerald-400 stroke-[2.5]" />
+                <span className="text-emerald-400">Link Copiado!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-4 h-4 text-brand-400" />
+                <span>Copiar Link do Biosite</span>
+              </>
+            )}
+          </button>
+
+          <a
+            href={biositePublicUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 md:flex-none min-h-[42px] px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-brand-500/25 transition-all cursor-pointer whitespace-nowrap"
+            title="Abrir página pública do seu Biosite em nova aba"
+          >
+            <ExternalLink className="w-4 h-4 stroke-[2.5]" />
+            <span>Abrir Biosite</span>
+          </a>
+        </div>
+      </div>
 
       {/* 4. MINI METRO DE FATURAMENTO & CARDS DE ESTATÍSTICAS */}
       <section className="max-w-7xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-3 my-5">

@@ -16,7 +16,6 @@ import { ServicesModal } from './components/ServicesModal';
 import { SocialProofModal } from './components/SocialProofModal';
 import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import { AdminCRM } from './components/AdminCRM';
-import { InstitutionalLanding } from './components/InstitutionalLanding';
 import { Toast } from './components/Toast';
 import { BiositeSkeleton } from './components/BiositeSkeleton';
 import { ProfileProvider, useProfile } from './context/ProfileContext';
@@ -90,14 +89,19 @@ function AppContent() {
     return <BiositeSkeleton />;
   }
 
-  // 1. ROTA GERAL ADMINISTRATIVA DO CRM (/admin ou /login)
-  if (isAdminView) {
+  // 1. ROTA RAIZ (/) OU ACESSO ADMINISTRATIVO (/admin, /login):
+  // Sem slug na URL, exibe diretamente a tela de Login / Mini-CRM do Personal Trainer
+  if (!hasSlugInUrl || isAdminView) {
     return (
       <AdminCRM
         profile={profile}
         onExit={() => {
           setIsAdminView(false);
-          window.location.hash = '';
+          if (profile.slug) {
+            window.location.search = `?p=${profile.slug}`;
+          } else {
+            window.location.hash = '';
+          }
         }}
         onShowToast={showToast}
         onUpdateProfile={updateProfileData}
@@ -106,22 +110,7 @@ function AppContent() {
     );
   }
 
-  // 2. SE NENHUM SLUG FOI INFORMADO NA URL RAIZ: Exibe página institucional do SaaS
-  if (!hasSlugInUrl) {
-    return (
-      <InstitutionalLanding
-        onGoToLogin={() => {
-          setIsAdminView(true);
-          window.location.hash = '#admin';
-        }}
-        onViewDemo={() => {
-          window.location.search = '?p=rodrigo-thor';
-        }}
-      />
-    );
-  }
-
-  // 3. SE O SLUG INFORMADO NÃO FOR ENCONTRADO NO BANCO: Exibe tela amigável de 404
+  // 2. SE O SLUG INFORMADO NÃO FOR ENCONTRADO NO BANCO: Exibe tela amigável de 404
   if (slugNotFound) {
     return (
       <div className="min-h-screen bg-[#08090C] text-slate-100 flex items-center justify-center p-4">
@@ -139,17 +128,8 @@ function AppContent() {
               className="w-full min-h-[44px] py-3 px-4 rounded-xl bg-brand-500 hover:bg-brand-600 text-slate-950 font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Conhecer a Plataforma</span>
+              <span>Ir para a Página de Login</span>
             </a>
-            <button
-              onClick={() => {
-                setIsAdminView(true);
-                window.location.hash = '#admin';
-              }}
-              className="w-full min-h-[40px] text-xs text-slate-400 hover:text-white transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <span>Você é o treinador? Acesse o Painel</span>
-            </button>
           </div>
         </div>
       </div>
@@ -162,14 +142,19 @@ function AppContent() {
 
   return (
     <div className="relative min-h-screen text-slate-100 flex flex-col justify-between selection:bg-brand-500 selection:text-white">
-      {/* Background Escuro com Foto de Academia e Overlay Vitrificado */}
+      {/* Background Escuro com Foto de Academia e Overlay Vitrificado Dinâmico */}
       <div
         className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none z-0 transform scale-105"
         style={{
           backgroundImage: `url(${bgImage})`,
         }}
       >
-        <div className="absolute inset-0 bg-gradient-to-b from-[#08090C]/85 via-[#08090C]/90 to-[#08090C] backdrop-blur-[6px]" />
+        <div 
+          className="absolute inset-0 backdrop-blur-[6px]"
+          style={{
+            background: `linear-gradient(to bottom, ${profile.cor_fundo || '#08090C'}D9, ${profile.cor_fundo || '#08090C'}E6, ${profile.cor_fundo || '#08090C'})`
+          }}
+        />
       </div>
 
       {/* Container Centralizado Responsivo (Mobile, Tablet & Desktop) */}

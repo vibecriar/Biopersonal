@@ -89,27 +89,27 @@ export const QuickLinksGrid: React.FC<QuickLinksGridProps> = ({
           transition={{ duration: 0.4, delay: 0.2 }}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          className="group relative flex flex-col items-start justify-between p-4 rounded-2xl glass-card text-left transition-all duration-300 hover:border-amber-500/50 hover:shadow-[0_0_25px_rgba(245,158,11,0.25)] min-h-[140px] cursor-pointer"
+          className="group relative flex flex-col items-start justify-between p-4 rounded-2xl glass-card text-left transition-all duration-300 hover:border-brand-500/50 hover:shadow-[0_0_25px_rgba(var(--brand-500-rgb,249_115_22),0.25)] min-h-[140px] cursor-pointer"
         >
           {/* Badge Vagas Abertas */}
-          <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30">
-            <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider">
+          <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-brand-500/15 border border-brand-500/30">
+            <span className="text-[10px] font-bold text-brand-300 uppercase tracking-wider">
               Vagas Abertas
             </span>
           </div>
 
           {/* Ícone */}
-          <div className="p-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 backdrop-blur-md text-amber-400 group-hover:scale-110 transition-transform">
+          <div className="p-2.5 rounded-xl border border-brand-500/30 bg-brand-500/10 backdrop-blur-md text-brand-400 group-hover:scale-110 transition-transform">
             <Dumbbell className="w-6 h-6" />
           </div>
 
           {/* Textos */}
           <div className="mt-3 w-full">
             <div className="flex items-center justify-between w-full">
-              <span className="font-bold text-sm sm:text-[15px] text-white tracking-tight group-hover:text-amber-400 transition-colors">
+              <span className="font-bold text-sm sm:text-[15px] text-white tracking-tight group-hover:text-brand-400 transition-colors">
                 Planos & Consultoria
               </span>
-              <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-amber-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+              <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-brand-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
             </div>
             <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1 group-hover:text-slate-300">
               Presencial VIP ou Online

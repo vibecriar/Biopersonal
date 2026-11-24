@@ -69,6 +69,9 @@ export interface ProfileConfig {
   slug?: string; // Slug único para URL pública (ex: /marcos-personal)
   data_expiracao?: string; // Data de vencimento da assinatura de 6 meses (YYYY-MM-DD)
   active?: boolean; // Status de ativação da assinatura no SaaS
+  cor_primaria?: string; // Cor primária (hex, ex: #F97316)
+  cor_fundo?: string; // Cor de fundo do biosite (hex, ex: #08090C ou #FFFFFF)
+  cor_texto?: string; // Cor de texto do biosite (hex, ex: #F8FAFC)
   name: string;
   role: string;
   tagline: string;

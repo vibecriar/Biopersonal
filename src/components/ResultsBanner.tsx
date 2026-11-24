@@ -23,7 +23,7 @@ export const ResultsBanner: React.FC<ResultsBannerProps> = ({
         transition={{ duration: 0.5, delay: 0.25 }}
         whileHover={{ scale: 1.015 }}
         whileTap={{ scale: 0.985 }}
-        className="group relative overflow-hidden rounded-2xl sm:rounded-3xl glass-card p-4 sm:p-5 border border-white/15 hover:border-brand-500/60 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-[0_0_35px_rgba(255,122,0,0.25)] flex flex-col justify-between"
+        className="group relative overflow-hidden rounded-2xl sm:rounded-3xl glass-card p-4 sm:p-5 border border-white/15 hover:border-brand-500/60 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-[0_0_35px_rgba(var(--brand-500-rgb,249_115_22),0.25)] flex flex-col justify-between"
       >
         {/* Efeito sutil de iluminação ambiente */}
         <div className="absolute top-0 right-0 -mr-10 -mt-10 w-36 h-36 bg-brand-500/15 rounded-full blur-2xl group-hover:bg-brand-500/25 transition-all pointer-events-none" />

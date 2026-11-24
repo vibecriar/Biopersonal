@@ -88,7 +88,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         particleCount: 80,
         spread: 70,
         origin: { y: 0.6 },
-        colors: ['#FF7A00', '#F97316', '#FBBF24', '#FFFFFF']
+        colors: [profile.cor_primaria || '#F97316', '#F97316', '#FBBF24', '#FFFFFF']
       });
     } catch {
       // Ignora se indisponível
@@ -478,7 +478,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                         required
                         checked={lgpdConsent}
                         onChange={(e) => setLgpdConsent(e.target.checked)}
-                        className="mt-0.5 w-4 h-4 rounded border-white/20 text-brand-500 focus:ring-brand-500 bg-white/5 cursor-pointer accent-[#FF7A00]"
+                        className="mt-0.5 w-4 h-4 rounded border-white/20 text-brand-500 focus:ring-brand-500 bg-white/5 cursor-pointer accent-[var(--brand-primary,#F97316)]"
                       />
                       <span className="text-[11px] text-slate-300 leading-snug">
                         Concordo em compartilhar meus dados de contato e objetivos físicos exclusivamente para atendimento e agendamento com o treinador, nos termos da{' '}
@@ -502,7 +502,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   <button
                     type="submit"
                     disabled={isLoading || !horario || !lgpdConsent}
-                    className="w-full mt-2 py-3.5 px-6 rounded-xl bg-gradient-to-r from-brand-500 to-amber-500 hover:from-brand-600 hover:to-amber-600 text-slate-950 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_8px_25px_rgba(255,122,0,0.35)] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full mt-2 py-3.5 px-6 rounded-xl bg-gradient-to-r from-brand-500 to-amber-500 hover:from-brand-600 hover:to-amber-600 text-slate-950 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-brand-500/25 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isLoading ? (
                       <>

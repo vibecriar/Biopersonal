@@ -2,19 +2,44 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { ProfileConfig } from '../types';
 import { profileConfig as fallbackProfile } from '../config/profile';
 import { getTrainer, getTrainerBySlug, updateTrainer } from '../lib/supabase';
+import { applyTheme } from '../lib/theme';
 
 export const getSlugFromUrl = (): string | null => {
   if (typeof window === 'undefined') return null;
+
+  // 1. Query Param: ?p=slug ou ?trainer=slug
   const searchParams = new URLSearchParams(window.location.search);
   const paramSlug = searchParams.get('p') || searchParams.get('trainer');
   if (paramSlug && paramSlug.trim()) {
     return paramSlug.trim().toLowerCase();
   }
+
+  // 2. Hash: #slug ou #/slug ou #/p/slug (exclui admin e login)
+  const rawHash = window.location.hash.replace(/^#\/?/, '').trim().toLowerCase();
+  if (rawHash && !rawHash.startsWith('access_token')) {
+    if (rawHash === 'admin' || rawHash === 'login') {
+      return null;
+    }
+    if (rawHash.startsWith('p/')) {
+      const part = rawHash.substring(2).trim();
+      if (part) return part;
+    }
+    // Não considera hashes vazios
+    if (rawHash.length > 0 && !rawHash.includes('=')) {
+      return rawHash;
+    }
+  }
+
+  // 3. Pathname: /p/:slug ou /:slug
   const path = window.location.pathname.replace(/^\/+|\/+$/g, '').trim().toLowerCase();
-  // Ignora rotas administrativas e arquivos estáticos
   if (path && path !== 'admin' && path !== 'login' && path !== 'index.html' && !path.includes('.')) {
+    if (path.startsWith('p/')) {
+      const part = path.substring(2).trim();
+      if (part) return part;
+    }
     return path;
   }
+
   return null;
 };
 
@@ -37,9 +62,22 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [slugNotFound, setSlugNotFound] = useState<boolean>(false);
+  const [currentSlug, setCurrentSlug] = useState<string | null>(() => getSlugFromUrl());
 
-  const slug = getSlugFromUrl();
-  const hasSlugInUrl = Boolean(slug);
+  const hasSlugInUrl = Boolean(currentSlug);
+
+  useEffect(() => {
+    const handleUrlChange = () => {
+      const detected = getSlugFromUrl();
+      setCurrentSlug(detected);
+    };
+    window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('hashchange', handleUrlChange);
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('hashchange', handleUrlChange);
+    };
+  }, []);
 
   const fetchProfile = async () => {
     setIsLoading(true);
@@ -47,18 +85,18 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setSlugNotFound(false);
 
     try {
-      if (slug) {
+      if (currentSlug) {
         // Carregamento dinâmico pelo slug na URL
-        const trainerBySlug = await getTrainerBySlug(slug);
+        const trainerBySlug = await getTrainerBySlug(currentSlug);
         if (trainerBySlug) {
           setProfile(trainerBySlug);
           setSlugNotFound(false);
         } else {
           setSlugNotFound(true);
-          setError(`Personal Trainer "${slug}" não encontrado.`);
+          setError(`Personal Trainer "${currentSlug}" não encontrado.`);
         }
       } else {
-        // Sem slug na URL (acesso à home geral)
+        // Sem slug na URL (acesso à home geral / CRM)
         const data = await getTrainer();
         setProfile(data);
       }
@@ -73,7 +111,18 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   useEffect(() => {
     fetchProfile();
-  }, []);
+  }, [currentSlug]);
+
+  // Aplica as cores dinâmicas no documento sempre que o perfil mudar
+  useEffect(() => {
+    if (profile) {
+      applyTheme({
+        cor_primaria: profile.cor_primaria,
+        cor_fundo: profile.cor_fundo,
+        cor_texto: profile.cor_texto
+      });
+    }
+  }, [profile?.cor_primaria, profile?.cor_fundo, profile?.cor_texto]);
 
   const updateProfileData = async (updates: Partial<ProfileConfig>): Promise<boolean> => {
     try {
@@ -112,7 +161,7 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
         error,
         slugNotFound,
         hasSlugInUrl,
-        currentSlug: slug,
+        currentSlug,
         refreshProfile: fetchProfile,
         updateProfileData
       }}

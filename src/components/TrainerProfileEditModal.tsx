@@ -18,11 +18,13 @@ import {
   Upload,
   Check,
   Globe,
-  AlertCircle
+  AlertCircle,
+  Palette
 } from 'lucide-react';
 import { InstagramIcon } from './icons/InstagramIcon';
 import { ProfileConfig, ServicePlan } from '../types';
 import { compressImage, uploadTrainerImage } from '../lib/imageCompression';
+import { PRESET_PALETTES, isValidHex } from '../lib/theme';
 
 interface TrainerProfileEditModalProps {
   isOpen: boolean;
@@ -32,7 +34,7 @@ interface TrainerProfileEditModalProps {
   onShowToast: (msg: string) => void;
 }
 
-type TabKey = 'geral' | 'midias' | 'planos' | 'horarios';
+type TabKey = 'geral' | 'cores' | 'midias' | 'planos' | 'horarios';
 
 export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = ({
   isOpen,
@@ -56,6 +58,11 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
   // Mídias
   const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl);
   const [bgImageUrl, setBgImageUrl] = useState(profile.bgImageUrl);
+
+  // Identidade Visual & Cores
+  const [corPrimaria, setCorPrimaria] = useState(profile.cor_primaria || '#F97316');
+  const [corFundo, setCorFundo] = useState(profile.cor_fundo || '#08090C');
+  const [corTexto, setCorTexto] = useState(profile.cor_texto || '#F8FAFC');
 
   // Upload e Compressão de Imagens
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
@@ -237,6 +244,9 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
         tagline: tagline.trim(),
         avatarUrl: avatarUrl.trim(),
         bgImageUrl: bgImageUrl.trim(),
+        cor_primaria: corPrimaria,
+        cor_fundo: corFundo,
+        cor_texto: corTexto,
         socialLinks: {
           ...profile.socialLinks,
           whatsapp: whatsapp.replace(/\D/g, ''),
@@ -320,6 +330,17 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
               >
                 <User className="w-3.5 h-3.5" />
                 <span>Dados & Bio</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('cores')}
+                className={`flex-1 min-h-[38px] px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  activeTab === 'cores' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Palette className="w-3.5 h-3.5" />
+                <span>Identidade & Cores</span>
               </button>
 
               <button
@@ -467,6 +488,256 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
                         placeholder="https://instagram.com/seuperfil"
                         className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs"
                       />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ABA 2: IDENTIDADE VISUAL & PALETA DE CORES */}
+              {activeTab === 'cores' && (
+                <div className="space-y-6">
+                  {/* Seção 1: 5 Paletas Pré-definidas */}
+                  <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Palette className="w-4 h-4 text-brand-400" />
+                      <h3 className="text-sm font-bold text-white">Paletas Rápidas Pré-definidas</h3>
+                    </div>
+                    <p className="text-xs text-slate-400 mb-4">
+                      Selecione uma paleta pronta otimizada para nichos fitness de alta conversão:
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {PRESET_PALETTES.map(p => {
+                        const isSelected =
+                          corPrimaria.toLowerCase() === p.cor_primaria.toLowerCase() &&
+                          corFundo.toLowerCase() === p.cor_fundo.toLowerCase();
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => {
+                              setCorPrimaria(p.cor_primaria);
+                              setCorFundo(p.cor_fundo);
+                              setCorTexto(p.cor_texto);
+                            }}
+                            className={`p-3.5 rounded-2xl text-left border transition-all cursor-pointer relative flex flex-col justify-between ${
+                              isSelected
+                                ? 'border-brand-500 bg-brand-500/10 ring-2 ring-brand-500/30 shadow-lg'
+                                : 'border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <span className="text-xs font-bold text-white">{p.name}</span>
+                              {isSelected && <Check className="w-4 h-4 text-brand-400 shrink-0 stroke-[2.5]" />}
+                            </div>
+                            <p className="text-[11px] text-slate-400 mb-3 leading-snug">{p.description}</p>
+                            <div className="flex items-center gap-2 mt-auto">
+                              <div className="flex items-center gap-1.5 p-1 rounded-lg bg-black/40 border border-white/10">
+                                <div
+                                  className="w-4 h-4 rounded-full border border-white/20 shadow-sm"
+                                  style={{ backgroundColor: p.cor_primaria }}
+                                  title={`Primária: ${p.cor_primaria}`}
+                                />
+                                <div
+                                  className="w-4 h-4 rounded-full border border-white/20 shadow-sm"
+                                  style={{ backgroundColor: p.cor_fundo }}
+                                  title={`Fundo: ${p.cor_fundo}`}
+                                />
+                                <div
+                                  className="w-4 h-4 rounded-full border border-white/20 shadow-sm"
+                                  style={{ backgroundColor: p.cor_texto }}
+                                  title={`Texto: ${p.cor_texto}`}
+                                />
+                              </div>
+                              <span className="text-[10px] text-slate-400 font-mono">{p.cor_primaria}</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Seção 2: Seletores de Cores Personalizadas */}
+                  <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10">
+                    <h3 className="text-sm font-bold text-white mb-1">Ajuste Fino de Cores</h3>
+                    <p className="text-xs text-slate-400 mb-4">
+                      Personalize qualquer detalhe visual usando o seletor ou digitando o código hexadecimal:
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      {/* Cor Primária */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+                          <span>Cor Primária (Destaque)</span>
+                          <span className="font-mono text-[10px] text-brand-400">{corPrimaria}</span>
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={corPrimaria}
+                            onChange={e => setCorPrimaria(e.target.value)}
+                            className="w-10 h-10 rounded-xl cursor-pointer bg-transparent border-0 p-0"
+                          />
+                          <input
+                            type="text"
+                            value={corPrimaria}
+                            onChange={e => setCorPrimaria(e.target.value)}
+                            placeholder="#F97316"
+                            className="flex-1 px-3 py-2 rounded-xl glass-input text-xs font-mono text-white uppercase"
+                          />
+                        </div>
+                        <span className="text-[10px] text-slate-500 mt-1 block">Botões CTA, badges, anel e ícones.</span>
+                      </div>
+
+                      {/* Cor de Fundo */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+                          <span>Cor de Fundo</span>
+                          <span className="font-mono text-[10px] text-slate-400">{corFundo}</span>
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={corFundo}
+                            onChange={e => setCorFundo(e.target.value)}
+                            className="w-10 h-10 rounded-xl cursor-pointer bg-transparent border-0 p-0"
+                          />
+                          <input
+                            type="text"
+                            value={corFundo}
+                            onChange={e => setCorFundo(e.target.value)}
+                            placeholder="#08090C"
+                            className="flex-1 px-3 py-2 rounded-xl glass-input text-xs font-mono text-white uppercase"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1 mt-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setCorFundo('#08090C')}
+                            className="px-2 py-0.5 rounded bg-black/60 hover:bg-black text-[10px] text-slate-300 border border-white/10 cursor-pointer"
+                          >
+                            Escuro #08090C
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCorFundo('#0A0A0A')}
+                            className="px-2 py-0.5 rounded bg-black/60 hover:bg-black text-[10px] text-slate-300 border border-white/10 cursor-pointer"
+                          >
+                            Onyx #0A0A0A
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Cor de Texto */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+                          <span>Cor do Texto</span>
+                          <span className="font-mono text-[10px] text-slate-400">{corTexto}</span>
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={corTexto}
+                            onChange={e => setCorTexto(e.target.value)}
+                            className="w-10 h-10 rounded-xl cursor-pointer bg-transparent border-0 p-0"
+                          />
+                          <input
+                            type="text"
+                            value={corTexto}
+                            onChange={e => setCorTexto(e.target.value)}
+                            placeholder="#F8FAFC"
+                            className="flex-1 px-3 py-2 rounded-xl glass-input text-xs font-mono text-white uppercase"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1 mt-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setCorTexto('#F8FAFC')}
+                            className="px-2 py-0.5 rounded bg-black/60 hover:bg-black text-[10px] text-slate-300 border border-white/10 cursor-pointer"
+                          >
+                            Gelo #F8FAFC
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCorTexto('#FFFFFF')}
+                            className="px-2 py-0.5 rounded bg-black/60 hover:bg-black text-[10px] text-slate-300 border border-white/10 cursor-pointer"
+                          >
+                            Branco #FFFFFF
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Seção 3: Pré-visualização em Tempo Real (Live Preview) */}
+                  <div
+                    className="p-5 rounded-2xl border transition-colors duration-300 shadow-xl"
+                    style={{ backgroundColor: corFundo, color: corTexto, borderColor: `${corPrimaria}40` }}
+                  >
+                    <div className="flex items-center justify-between mb-3 pb-2 border-b border-white/10">
+                      <span className="text-[11px] font-bold uppercase tracking-wider opacity-80 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5" style={{ color: corPrimaria }} />
+                        Pré-visualização em Tempo Real do Biosite
+                      </span>
+                      <span
+                        className="text-[10px] font-bold px-2.5 py-0.5 rounded-full"
+                        style={{
+                          backgroundColor: `${corPrimaria}25`,
+                          color: corPrimaria,
+                          border: `1px solid ${corPrimaria}50`
+                        }}
+                      >
+                        {cref || 'CREF ATIVO'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3.5 mb-4">
+                      <div
+                        className="w-12 h-12 rounded-full p-0.5 shrink-0 shadow-lg"
+                        style={{ border: `2px solid ${corPrimaria}` }}
+                      >
+                        <img
+                          src={avatarUrl || profile.avatarUrl}
+                          alt="Avatar"
+                          className="w-full h-full rounded-full object-cover"
+                        />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black" style={{ color: corTexto }}>
+                          {name || 'Nome do Personal'}
+                        </h4>
+                        <p className="text-[11px] opacity-75 line-clamp-1">
+                          {role || 'Personal Trainer & Consultoria'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      <button
+                        type="button"
+                        className="w-full py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                        style={{
+                          backgroundColor: corPrimaria,
+                          color: '#08090C',
+                          boxShadow: `0 6px 20px ${corPrimaria}40`
+                        }}
+                      >
+                        <span>Agendar Aula Experimental</span>
+                      </button>
+
+                      <div
+                        className="p-3 rounded-xl border flex items-center justify-between text-xs"
+                        style={{
+                          backgroundColor: `${corPrimaria}12`,
+                          borderColor: `${corPrimaria}30`,
+                          color: corTexto
+                        }}
+                      >
+                        <span className="font-semibold">Plano Consultoria Online VIP</span>
+                        <span className="font-mono font-bold" style={{ color: corPrimaria }}>
+                          R$ 297/mês
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>

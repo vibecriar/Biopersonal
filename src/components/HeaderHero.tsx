@@ -30,16 +30,16 @@ export const HeaderHero: React.FC<HeaderHeroProps> = ({ profile }) => {
         <div className="absolute inset-0 rounded-full border-2 border-brand-500/60 bg-brand-500/20 sonar-wave-1 pointer-events-none" />
         
         {/* Onda Sonar 2 (fase alternada para pulso contínuo) */}
-        <div className="absolute inset-0 rounded-full border-2 border-amber-400/50 bg-amber-500/15 sonar-wave-2 pointer-events-none" />
+        <div className="absolute inset-0 rounded-full border-2 border-brand-400/50 bg-brand-400/15 sonar-wave-2 pointer-events-none" />
 
         {/* Halo de Brilho Neon Ambiente */}
-        <div className="absolute -inset-2 rounded-full bg-gradient-to-r from-brand-500 via-amber-400 to-brand-600 blur-xl opacity-75 animate-pulse pointer-events-none" />
+        <div className="absolute -inset-2 rounded-full bg-gradient-to-r from-brand-500 via-brand-400 to-brand-600 blur-xl opacity-75 animate-pulse pointer-events-none" />
 
         {/* Círculo Central Pulsante do Personal */}
         <motion.div
           animate={{ scale: [1, 1.035, 1] }}
           transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
-          className="relative p-1 sm:p-1.5 rounded-full bg-[#0d0f14] border-2 sm:border-[3px] border-brand-500 shadow-[0_0_35px_rgba(255,122,0,0.55),0_0_70px_rgba(255,122,0,0.25)] avatar-pulse-breath z-10"
+          className="relative p-1 sm:p-1.5 rounded-full bg-[#0d0f14] border-2 sm:border-[3px] border-brand-500 shadow-[0_0_35px_rgba(var(--brand-500-rgb,249_115_22),0.55),0_0_70px_rgba(var(--brand-500-rgb,249_115_22),0.25)] avatar-pulse-breath z-10"
         >
           <img
             src={profile.avatarUrl}

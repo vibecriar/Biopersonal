@@ -422,6 +422,9 @@ export function mapTrainerRowToProfile(data: any): ProfileConfig {
     slug: data.slug || undefined,
     data_expiracao: data.data_expiracao || undefined,
     active: data.active !== false,
+    cor_primaria: data.cor_primaria || profileConfig.cor_primaria || '#F97316',
+    cor_fundo: data.cor_fundo || profileConfig.cor_fundo || '#08090C',
+    cor_texto: data.cor_texto || profileConfig.cor_texto || '#F8FAFC',
     name: data.name || profileConfig.name,
     role: data.role || profileConfig.role,
     tagline: data.tagline || data.bio || profileConfig.tagline,
@@ -644,6 +647,9 @@ export async function updateTrainer(
   if (updates.availableHours !== undefined) payload.available_hours = updates.availableHours;
   if (updates.data_expiracao !== undefined) payload.data_expiracao = updates.data_expiracao;
   if (updates.active !== undefined) payload.active = updates.active;
+  if (updates.cor_primaria !== undefined) payload.cor_primaria = updates.cor_primaria;
+  if (updates.cor_fundo !== undefined) payload.cor_fundo = updates.cor_fundo;
+  if (updates.cor_texto !== undefined) payload.cor_texto = updates.cor_texto;
 
   if (supabase) {
     try {

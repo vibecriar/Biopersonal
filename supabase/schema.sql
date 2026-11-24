@@ -24,7 +24,10 @@ CREATE TABLE IF NOT EXISTS public.trainers (
     social_proof JSONB DEFAULT '{}'::jsonb,
     available_hours JSONB DEFAULT '{"Manhã": ["06:00","07:00","08:00","09:00","10:00","11:00"], "Tarde": ["14:00","15:00","16:00","17:00"], "Noite": ["18:00","19:00","20:00","21:00"]}'::jsonb,
     data_expiracao DATE DEFAULT (CURRENT_DATE + INTERVAL '180 days'),
-    active BOOLEAN DEFAULT true
+    active BOOLEAN DEFAULT true,
+    cor_primaria TEXT DEFAULT '#F97316',
+    cor_fundo TEXT DEFAULT '#08090C',
+    cor_texto TEXT DEFAULT '#F8FAFC'
 );
 
 -- 2. Criação da tabela de leads e agendamentos vinculada ao personal (trainer_id)
@@ -93,6 +96,15 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'trainers' AND column_name = 'available_hours') THEN
         ALTER TABLE public.trainers ADD COLUMN available_hours JSONB DEFAULT '{"Manhã": ["06:00","07:00","08:00","09:00","10:00","11:00"], "Tarde": ["14:00","15:00","16:00","17:00"], "Noite": ["18:00","19:00","20:00","21:00"]}'::jsonb;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'trainers' AND column_name = 'cor_primaria') THEN
+        ALTER TABLE public.trainers ADD COLUMN cor_primaria TEXT DEFAULT '#F97316';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'trainers' AND column_name = 'cor_fundo') THEN
+        ALTER TABLE public.trainers ADD COLUMN cor_fundo TEXT DEFAULT '#08090C';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'trainers' AND column_name = 'cor_texto') THEN
+        ALTER TABLE public.trainers ADD COLUMN cor_texto TEXT DEFAULT '#F8FAFC';
     END IF;
 END $$;
 

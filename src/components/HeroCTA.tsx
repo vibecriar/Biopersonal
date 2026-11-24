@@ -15,14 +15,14 @@ export const HeroCTA: React.FC<HeroCTAProps> = ({ onOpenBooking }) => {
         transition={{ duration: 0.5, delay: 0.1 }}
         className="relative group"
       >
-        {/* Glow de fundo neon laranja vibrante com pulso sutil */}
-        <div className="absolute -inset-1 bg-gradient-to-r from-brand-500 via-amber-400 to-brand-600 rounded-2xl blur-lg opacity-70 group-hover:opacity-100 transition duration-500 group-hover:duration-200 animate-pulse pointer-events-none" />
+        {/* Glow de fundo neon vibrante com pulso sutil */}
+        <div className="absolute -inset-1 bg-gradient-to-r from-brand-500 via-brand-400 to-brand-600 rounded-2xl blur-lg opacity-70 group-hover:opacity-100 transition duration-500 group-hover:duration-200 animate-pulse pointer-events-none" />
 
         <motion.button
           onClick={onOpenBooking}
           whileHover={{ scale: 1.015 }}
           whileTap={{ scale: 0.985 }}
-          className="relative w-full overflow-hidden flex items-center justify-between p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[#FF7A00] via-[#FF8A1E] to-[#FF6200] text-slate-950 font-black shadow-[0_12px_36px_rgba(255,122,0,0.4)] border border-amber-200/50 cursor-pointer min-h-[64px] transition-all"
+          className="relative w-full overflow-hidden flex items-center justify-between p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-brand-500 via-brand-400 to-brand-600 text-slate-950 font-black shadow-[0_12px_36px_rgba(var(--brand-500-rgb,249_115_22),0.4)] border border-white/20 cursor-pointer min-h-[64px] transition-all"
         >
           {/* Efeito Shimmer reflexivo deslizante */}
           <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/30 to-transparent pointer-events-none" />
