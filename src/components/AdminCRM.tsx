@@ -192,13 +192,26 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
 
   const supabaseActive = isSupabaseConfigured();
 
-  // Login com E-mail e Senha no Supabase Auth
+  // Login com E-mail e Senha no Supabase Auth (com fallback para modo Demo/Local)
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
     setIsAuthenticating(true);
 
     try {
+      if (!supabaseActive) {
+        // Modo Standalone / Demo local sem Supabase conectado
+        if (emailInput.trim().includes('@') && passwordInput.length >= 4) {
+          setIsAuthenticated(true);
+          setCurrentUserEmail(emailInput.trim());
+          onShowToast('Entrou com sucesso em Modo Local / Demonstração!');
+          return;
+        } else {
+          setAuthError('No modo Demo, use qualquer e-mail válido e senha com pelo menos 4 dígitos (ex: admin@biopersonal.com / admin123).');
+          return;
+        }
+      }
+
       const { data, error } = await signInTrainer(emailInput, passwordInput);
       if (error || !data?.user) {
         setAuthError(error?.message || 'E-mail ou senha incorretos.');
@@ -584,6 +597,27 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
               )}
             </button>
           </form>
+
+          {!supabaseActive && (
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-slate-300 text-[11px] text-left mt-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-bold text-amber-400">Modo Local / Demonstração</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmailInput('admin@biopersonal.com');
+                    setPasswordInput('admin123');
+                  }}
+                  className="text-[10px] font-bold text-brand-400 hover:text-brand-300 underline cursor-pointer"
+                >
+                  Preencher Acesso Demo
+                </button>
+              </div>
+              <p className="text-slate-400">
+                Para testar sem Supabase, use <strong className="text-white font-mono">admin@biopersonal.com</strong> e senha <strong className="text-white font-mono">admin123</strong>.
+              </p>
+            </div>
+          )}
 
           {activeProfile.slug && (
             <a

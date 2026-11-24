@@ -1,17 +1,17 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  X, 
-  Save, 
-  User, 
-  Phone, 
-  Image as ImageIcon, 
-  Clock, 
-  Dumbbell, 
-  Plus, 
-  Trash2, 
-  CheckCircle2, 
-  Loader2, 
+import {
+  X,
+  Save,
+  User,
+  Phone,
+  Image as ImageIcon,
+  Clock,
+  Dumbbell,
+  Plus,
+  Trash2,
+  CheckCircle2,
+  Loader2,
   Sparkles,
   ShieldCheck,
   CreditCard,
@@ -324,9 +324,8 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
               <button
                 type="button"
                 onClick={() => setActiveTab('geral')}
-                className={`flex-1 min-h-[38px] px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                  activeTab === 'geral' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-                }`}
+                className={`flex-1 min-h-[38px] px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'geral' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+                  }`}
               >
                 <User className="w-3.5 h-3.5" />
                 <span>Dados & Bio</span>
@@ -335,9 +334,8 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
               <button
                 type="button"
                 onClick={() => setActiveTab('cores')}
-                className={`flex-1 min-h-[38px] px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                  activeTab === 'cores' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-                }`}
+                className={`flex-1 min-h-[38px] px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'cores' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+                  }`}
               >
                 <Palette className="w-3.5 h-3.5" />
                 <span>Identidade & Cores</span>
@@ -346,9 +344,8 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
               <button
                 type="button"
                 onClick={() => setActiveTab('midias')}
-                className={`flex-1 min-h-[38px] px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                  activeTab === 'midias' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-                }`}
+                className={`flex-1 min-h-[38px] px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'midias' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+                  }`}
               >
                 <ImageIcon className="w-3.5 h-3.5" />
                 <span>Foto & Fundo</span>
@@ -357,9 +354,8 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
               <button
                 type="button"
                 onClick={() => setActiveTab('planos')}
-                className={`flex-1 min-h-[38px] px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                  activeTab === 'planos' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-                }`}
+                className={`flex-1 min-h-[38px] px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'planos' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+                  }`}
               >
                 <CreditCard className="w-3.5 h-3.5" />
                 <span>Planos ({services.length})</span>
@@ -368,9 +364,8 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
               <button
                 type="button"
                 onClick={() => setActiveTab('horarios')}
-                className={`flex-1 min-h-[38px] px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                  activeTab === 'horarios' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-                }`}
+                className={`flex-1 min-h-[38px] px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'horarios' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+                  }`}
               >
                 <Clock className="w-3.5 h-3.5" />
                 <span>Grade de Horários</span>
@@ -520,11 +515,10 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
                               setCorFundo(p.cor_fundo);
                               setCorTexto(p.cor_texto);
                             }}
-                            className={`p-3.5 rounded-2xl text-left border transition-all cursor-pointer relative flex flex-col justify-between ${
-                              isSelected
+                            className={`p-3.5 rounded-2xl text-left border transition-all cursor-pointer relative flex flex-col justify-between ${isSelected
                                 ? 'border-brand-500 bg-brand-500/10 ring-2 ring-brand-500/30 shadow-lg'
                                 : 'border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10'
-                            }`}
+                              }`}
                           >
                             <div className="flex items-center justify-between gap-2 mb-2">
                               <span className="text-xs font-bold text-white">{p.name}</span>

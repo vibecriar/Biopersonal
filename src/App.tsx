@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { 
+import {
   MessageCircle,
   AlertTriangle,
   ArrowLeft,
@@ -21,14 +21,14 @@ import { BiositeSkeleton } from './components/BiositeSkeleton';
 import { ProfileProvider, useProfile } from './context/ProfileContext';
 
 function AppContent() {
-  const { 
-    profile, 
-    setProfile, 
-    isLoading, 
-    slugNotFound, 
-    hasSlugInUrl, 
-    currentSlug, 
-    updateProfileData 
+  const {
+    profile,
+    setProfile,
+    isLoading,
+    slugNotFound,
+    hasSlugInUrl,
+    currentSlug,
+    updateProfileData
   } = useProfile();
 
   const [isAdminView, setIsAdminView] = useState(() => {
@@ -164,11 +164,11 @@ function AppContent() {
           <HeaderHero profile={profile} />
 
           {/* 2. Hero CTA Full Width de Alta Conversão */}
-          <HeroCTA 
+          <HeroCTA
             onOpenBooking={() => {
               setSelectedService(undefined);
               setIsBookingOpen(true);
-            }} 
+            }}
           />
 
           {/* 3. Grade Estratégica de Ações Rápidas (WhatsApp Direto & Planos/Consultoria) */}
