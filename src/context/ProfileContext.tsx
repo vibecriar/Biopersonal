@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { ProfileConfig } from '../types';
-import { profileConfig as fallbackProfile } from '../config/profile';
+import { emptyProfile } from '../config/profile';
 import { getTrainer, getTrainerBySlug, updateTrainer } from '../lib/supabase';
 import { applyTheme } from '../lib/theme';
 
@@ -58,7 +58,7 @@ interface ProfileContextType {
 const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 
 export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [profile, setProfile] = useState<ProfileConfig>(fallbackProfile);
+  const [profile, setProfile] = useState<ProfileConfig>(emptyProfile);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [slugNotFound, setSlugNotFound] = useState<boolean>(false);
@@ -86,24 +86,26 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     try {
       if (currentSlug) {
-        // Carregamento dinâmico pelo slug na URL
+        // Carregamento dinâmico pelo slug na URL consultando o Supabase
         const trainerBySlug = await getTrainerBySlug(currentSlug);
         if (trainerBySlug) {
           setProfile(trainerBySlug);
           setSlugNotFound(false);
         } else {
+          setProfile(emptyProfile);
           setSlugNotFound(true);
-          setError(`Personal Trainer "${currentSlug}" não encontrado.`);
+          setError('Perfil não encontrado.');
         }
       } else {
-        // Sem slug na URL (acesso à home geral / CRM)
-        const data = await getTrainer();
-        setProfile(data);
+        // Sem slug na URL (acesso à home geral / Login do CRM)
+        setProfile(emptyProfile);
+        setSlugNotFound(false);
       }
     } catch (err: any) {
       console.warn('Erro ao obter perfil do treinador:', err);
       setError(err?.message || 'Erro ao carregar dados do treinador');
-      setProfile(fallbackProfile);
+      setProfile(emptyProfile);
+      setSlugNotFound(true);
     } finally {
       setIsLoading(false);
     }
@@ -115,34 +117,22 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Aplica as cores dinâmicas no documento sempre que o perfil mudar
   useEffect(() => {
-    if (profile) {
+    if (profile && profile.id) {
       applyTheme({
         cor_primaria: profile.cor_primaria,
         cor_fundo: profile.cor_fundo,
         cor_texto: profile.cor_texto
       });
     }
-  }, [profile?.cor_primaria, profile?.cor_fundo, profile?.cor_texto]);
+  }, [profile?.cor_primaria, profile?.cor_fundo, profile?.cor_texto, profile?.id]);
 
   const updateProfileData = async (updates: Partial<ProfileConfig>): Promise<boolean> => {
     try {
-      const trainerId = profile.id || fallbackProfile.id || 'default';
+      const trainerId = profile.id;
+      if (!trainerId) return false;
       const result = await updateTrainer(trainerId, updates);
       if (result.success && result.data) {
         setProfile(result.data);
-        return true;
-      }
-      if (result.success) {
-        setProfile(prev => ({
-          ...prev,
-          ...updates,
-          socialLinks: {
-            ...prev.socialLinks,
-            ...(updates.socialLinks || {})
-          },
-          services: updates.services || prev.services,
-          availableHours: updates.availableHours || prev.availableHours
-        }));
         return true;
       }
       return false;

@@ -118,7 +118,7 @@ function AppContent() {
           <div className="inline-flex p-3 rounded-2xl bg-amber-500/10 text-amber-400 mb-4 border border-amber-500/30">
             <AlertTriangle className="w-8 h-8" />
           </div>
-          <h2 className="text-xl sm:text-2xl font-black text-white">Biosite Não Encontrado</h2>
+          <h2 className="text-xl sm:text-2xl font-black text-white">Perfil não encontrado</h2>
           <p className="text-xs text-slate-400 mt-2 mb-6 leading-relaxed">
             O endereço <code className="text-brand-300 font-mono">/{currentSlug}</code> não corresponde a um personal trainer ativo no sistema.
           </p>
@@ -149,7 +149,7 @@ function AppContent() {
           backgroundImage: `url(${bgImage})`,
         }}
       >
-        <div 
+        <div
           className="absolute inset-0 backdrop-blur-[6px]"
           style={{
             background: `linear-gradient(to bottom, ${profile.cor_fundo || '#08090C'}D9, ${profile.cor_fundo || '#08090C'}E6, ${profile.cor_fundo || '#08090C'})`
@@ -182,10 +182,12 @@ function AppContent() {
           />
 
           {/* 4. Banner Prova Social com "Ver Transformações Reais" */}
-          <ResultsBanner
-            profile={profile}
-            onOpenSocialProof={() => setIsSocialProofOpen(true)}
-          />
+          {profile.socialProof?.transformations && profile.socialProof.transformations.length > 0 && (
+            <ResultsBanner
+              profile={profile}
+              onOpenSocialProof={() => setIsSocialProofOpen(true)}
+            />
+          )}
 
           {/* 5. Seção "Por Que Treinar Comigo?" (3 Pilares + CTA de Fechamento de Objeções) */}
           <WhyTrainWithMe
@@ -226,10 +228,10 @@ function AppContent() {
           </div>
 
           <p className="text-[11px] text-slate-500 font-medium">
-            © {new Date().getFullYear()} {profile.name} • Todos os direitos reservados.
+            © {new Date().getFullYear()} {profile.name || 'Personal Trainer'} • Todos os direitos reservados.
           </p>
           <p className="text-[10px] text-slate-600 font-mono mt-0.5">
-            Registro Profissional: {profile.cref}
+            Registro Profissional: {profile.cref?.trim() ? profile.cref : 'CREF não informado'}
           </p>
 
           {/* Link Discreto para Política de Privacidade e Termos LGPD */}

@@ -44,6 +44,7 @@ import {
   Check
 } from 'lucide-react';
 import { LeadAgendamento, LeadStatus, ProfileConfig, PaymentMethod } from '../types';
+import { emptyProfile } from '../config/profile';
 import { 
   getLeads, 
   updateLeadStatus, 
@@ -236,11 +237,16 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
     }
   };
 
-  // Logout seguro
+  // Logout seguro e limpeza total de estados
   const handleLogout = async () => {
     await signOutTrainer();
     setIsAuthenticated(false);
     setCurrentUserEmail(null);
+    setEmailInput('');
+    setPasswordInput('');
+    setLeads([]);
+    setActiveProfile(emptyProfile);
+    if (onSetContextProfile) onSetContextProfile(emptyProfile);
     onShowToast('Sessão encerrada com sucesso.');
   };
 
@@ -661,7 +667,7 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              Profissional: <strong className="text-slate-200">{activeProfile.name}</strong> • {activeProfile.cref}
+              Profissional: <strong className="text-slate-200">{activeProfile.name || 'Personal Trainer'}</strong> • {activeProfile.cref?.trim() ? activeProfile.cref : 'CREF não informado'}
               {currentUserEmail && <span className="ml-1 text-slate-500">({currentUserEmail})</span>}
             </p>
           </div>
@@ -671,7 +677,7 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
         <div className="flex flex-wrap items-center gap-2">
           {/* Link para visualização do Biosite Público do Personal */}
           <a
-            href={`/?p=${activeProfile.slug || activeProfile.id || ''}`}
+            href={biositePublicUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="min-h-[44px] flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 font-bold text-xs border border-white/10 transition-all cursor-pointer"

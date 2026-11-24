@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ShieldCheck, Flame, Sparkles } from 'lucide-react';
+import { ShieldCheck, Flame, User } from 'lucide-react';
 import { ProfileConfig } from '../types';
 
 interface HeaderHeroProps {
@@ -21,7 +21,7 @@ export const HeaderHero: React.FC<HeaderHeroProps> = ({ profile }) => {
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
           <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
         </span>
-        <span>Agenda Aberta • Vagas Limitadas</span>
+        <span>Agenda Aberta • Vagas Disponíveis</span>
       </motion.div>
 
       {/* Foto / Logo com Círculo Central Pulsante (Ondas Sonar + Respiração + Glow Neon) */}
@@ -41,12 +41,18 @@ export const HeaderHero: React.FC<HeaderHeroProps> = ({ profile }) => {
           transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
           className="relative p-1 sm:p-1.5 rounded-full bg-[#0d0f14] border-2 sm:border-[3px] border-brand-500 shadow-[0_0_35px_rgba(var(--brand-500-rgb,249_115_22),0.55),0_0_70px_rgba(var(--brand-500-rgb,249_115_22),0.25)] avatar-pulse-breath z-10"
         >
-          <img
-            src={profile.avatarUrl}
-            alt={profile.name}
-            className="w-28 h-28 sm:w-36 sm:h-36 md:w-40 md:h-40 rounded-full object-cover border border-white/20 shadow-inner"
-            loading="eager"
-          />
+          {profile.avatarUrl ? (
+            <img
+              src={profile.avatarUrl}
+              alt={profile.name || 'Personal'}
+              className="w-28 h-28 sm:w-36 sm:h-36 md:w-40 md:h-40 rounded-full object-cover border border-white/20 shadow-inner"
+              loading="eager"
+            />
+          ) : (
+            <div className="w-28 h-28 sm:w-36 sm:h-36 md:w-40 md:h-40 rounded-full bg-white/5 border border-white/20 flex items-center justify-center text-brand-400">
+              <User className="w-12 h-12" />
+            </div>
+          )}
 
           {/* Badge flutuante de especialista */}
           <motion.div 
@@ -68,28 +74,30 @@ export const HeaderHero: React.FC<HeaderHeroProps> = ({ profile }) => {
         className="w-full max-w-md sm:max-w-xl md:max-w-2xl px-2"
       >
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-white flex items-center justify-center gap-2 flex-wrap">
-          <span>{profile.name}</span>
-          <span title="CREF Verificado" className="inline-flex items-center">
+          <span>{profile.name || 'Personal Trainer'}</span>
+          <span title="Profissional Verificado" className="inline-flex items-center">
             <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6 text-brand-500 flex-shrink-0" />
           </span>
         </h1>
 
         <div className="flex items-center justify-center gap-2 mt-1.5 flex-wrap">
           <p className="text-xs sm:text-sm md:text-[15px] font-bold tracking-wide text-brand-400 uppercase">
-            {profile.role}
+            {profile.role || 'Personal Trainer'}
           </p>
           <span className="text-white/30 text-xs hidden xs:inline">•</span>
           <span className="text-[11px] sm:text-xs font-mono text-slate-300 bg-white/5 px-2.5 py-0.5 rounded-md border border-white/10">
-            {profile.cref}
+            {profile.cref?.trim() ? profile.cref : 'CREF não informado'}
           </span>
         </div>
 
-        {/* Frase de Impacto entre Aspas */}
-        <p className="mt-3.5 sm:mt-4 text-sm sm:text-base md:text-[17px] leading-relaxed text-slate-300 font-medium italic relative px-2 sm:px-6">
-          <span className="text-brand-500 font-serif text-xl sm:text-2xl select-none leading-none mr-1">“</span>
-          {profile.tagline}
-          <span className="text-brand-500 font-serif text-xl sm:text-2xl select-none leading-none ml-1">”</span>
-        </p>
+        {/* Frase de Impacto entre Aspas (apenas se preenchida) */}
+        {profile.tagline && profile.tagline.trim().length > 0 && (
+          <p className="mt-3.5 sm:mt-4 text-sm sm:text-base md:text-[17px] leading-relaxed text-slate-300 font-medium italic relative px-2 sm:px-6">
+            <span className="text-brand-500 font-serif text-xl sm:text-2xl select-none leading-none mr-1">“</span>
+            {profile.tagline}
+            <span className="text-brand-500 font-serif text-xl sm:text-2xl select-none leading-none ml-1">”</span>
+          </p>
+        )}
       </motion.div>
     </header>
   );

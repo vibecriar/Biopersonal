@@ -1,16 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 import { LeadAgendamento, LeadStatus, ProfileConfig } from '../types';
-import { profileConfig } from '../config/profile';
+import { emptyProfile } from '../config/profile';
 
 const rawSupabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const rawSupabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 // Sanitização estrita contra espaços, aspas acidentais e quebras de linha no .env
-export const supabaseUrl = typeof rawSupabaseUrl === 'string' 
-  ? rawSupabaseUrl.trim().replace(/^["']|["']$/g, '') 
+export const supabaseUrl = typeof rawSupabaseUrl === 'string'
+  ? rawSupabaseUrl.trim().replace(/^["']|["']$/g, '')
   : '';
-export const supabaseAnonKey = typeof rawSupabaseAnonKey === 'string' 
-  ? rawSupabaseAnonKey.trim().replace(/^["']|["']$/g, '') 
+export const supabaseAnonKey = typeof rawSupabaseAnonKey === 'string'
+  ? rawSupabaseAnonKey.trim().replace(/^["']|["']$/g, '')
   : '';
 
 export const isSupabaseConfigured = (): boolean => {
@@ -29,13 +29,13 @@ export const isSupabaseConfigured = (): boolean => {
 // Cliente Supabase com persistência de sessão e autenticação completa para multi-tenant SaaS
 export const supabase = isSupabaseConfigured()
   ? createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-        storageKey: 'biopersonal_auth_session'
-      }
-    })
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storageKey: 'biopersonal_auth_session'
+    }
+  })
   : null;
 
 // Helper para validar UUID antes de passar para cláusulas SQL/PostgreSQL
@@ -44,195 +44,20 @@ export const isValidUuid = (val?: string | null): boolean => {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim());
 };
 
-const STORAGE_KEY = 'biopersonal_leads_crm_v3';
-
-// Helper de datas relativas para demonstrar os alertas em tempo real
-const now = Date.now();
-const dayMs = 1000 * 60 * 60 * 24;
-
-const formatDateStr = (timestamp: number) => new Date(timestamp).toISOString().split('T')[0];
-const todayStr = formatDateStr(now);
-
-const INITIAL_MOCK_LEADS: LeadAgendamento[] = [
-  {
-    id: 'lead-1',
-    created_at: new Date(now - 55 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(now - 55 * 60 * 60 * 1000).toISOString(),
-    nome: 'Mariana Duarte',
-    whatsapp: '5511987654321',
-    objetivo: 'Emagrecimento',
-    data_preferencia: todayStr, // Hoje às 11:00
-    turno_preferencia: 'Manhã',
-    horario: '11:00',
-    tipo_atendimento: 'Online',
-    observacoes: 'Quero perder 8kg e definir abdômen.',
-    status: 'Novo Lead',
-    plano_interesse: 'Consultoria Online Black'
-  },
-  {
-    id: 'lead-2',
-    created_at: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
-    nome: 'Rafael Nogueira',
-    whatsapp: '5511977771234',
-    objetivo: 'Hipertrofia',
-    data_preferencia: todayStr, // Hoje às 07:00
-    turno_preferencia: 'Manhã',
-    horario: '07:00',
-    tipo_atendimento: 'Presencial',
-    observacoes: 'Treino de força focado em peito e tríceps.',
-    status: 'Convertido',
-    plano_interesse: 'Personal Presencial VIP',
-    plano_tipo: 'Mensal',
-    plano_valor: 1200,
-    payment_method: 'Cartão / Recorrência',
-    data_inicio: formatDateStr(now - dayMs * 10),
-    data_vencimento: formatDateStr(now + dayMs * 20)
-  },
-  {
-    id: 'lead-3',
-    created_at: new Date(now - 74 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(now - 74 * 60 * 60 * 1000).toISOString(),
-    nome: 'Lucas Albuquerque',
-    whatsapp: '5511976543210',
-    objetivo: 'Hipertrofia',
-    data_preferencia: todayStr, // Hoje às 18:00
-    turno_preferencia: 'Noite',
-    horario: '18:00',
-    tipo_atendimento: 'Presencial',
-    observacoes: 'Enviei a proposta de consultoria por WhatsApp.',
-    status: 'Contato Feito',
-    plano_interesse: 'Consultoria Online Black'
-  },
-  {
-    id: 'lead-4',
-    created_at: new Date(now - 12 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(now - 12 * 60 * 60 * 1000).toISOString(),
-    nome: 'Beatriz Vasques',
-    whatsapp: '5511965432109',
-    objetivo: 'Saúde & Longevidade',
-    data_preferencia: todayStr, // Hoje às 09:00
-    turno_preferencia: 'Manhã',
-    horario: '09:00',
-    tipo_atendimento: 'Avaliação',
-    observacoes: 'Avaliação física inicial e teste de flexibilidade.',
-    status: 'Avaliação Agendada',
-    plano_interesse: 'Personal Presencial VIP'
-  },
-  {
-    id: 'lead-5',
-    created_at: new Date(now - dayMs * 27).toISOString(),
-    updated_at: new Date(now - dayMs * 1).toISOString(),
-    nome: 'Juliana Prado',
-    whatsapp: '5511954321098',
-    objetivo: 'Emagrecimento',
-    data_preferencia: formatDateStr(now + dayMs * 1), // Amanhã às 08:00
-    turno_preferencia: 'Manhã',
-    horario: '08:00',
-    tipo_atendimento: 'Online',
-    observacoes: 'Evolução incrível, perdeu 3.2kg no 1º mês.',
-    status: 'Convertido',
-    plano_interesse: 'Consultoria Online Black',
-    plano_tipo: 'Mensal',
-    plano_valor: 197,
-    payment_method: 'Pix',
-    data_inicio: formatDateStr(now - dayMs * 27),
-    data_vencimento: formatDateStr(now + dayMs * 3) // ALERTA: Vence em 3 dias!
-  },
-  {
-    id: 'lead-6',
-    created_at: new Date(now - dayMs * 12).toISOString(),
-    updated_at: new Date(now - dayMs * 2).toISOString(),
-    nome: 'Felipe Santana (VIP)',
-    whatsapp: '5511943210987',
-    objetivo: 'Hipertrofia',
-    data_preferencia: todayStr, // Hoje às 16:00
-    turno_preferencia: 'Tarde',
-    horario: '16:00',
-    tipo_atendimento: 'Presencial',
-    observacoes: 'Acompanhamento presencial 3x/semana.',
-    status: 'Convertido',
-    plano_interesse: 'Personal Presencial VIP',
-    plano_tipo: 'Mensal',
-    plano_valor: 1200,
-    payment_method: 'Pix',
-    data_inicio: formatDateStr(now - dayMs * 12),
-    data_vencimento: formatDateStr(now + dayMs * 18)
-  },
-  {
-    id: 'lead-7',
-    created_at: new Date(now - dayMs * 89).toISOString(),
-    updated_at: new Date(now - dayMs * 3).toISOString(),
-    nome: 'Gustavo Mendonça',
-    whatsapp: '5511932109876',
-    objetivo: 'Condicionamento Físico',
-    data_preferencia: todayStr, // Hoje às 19:00
-    turno_preferencia: 'Noite',
-    horario: '19:00',
-    tipo_atendimento: 'Presencial',
-    observacoes: 'Concluindo o Desafio 90 Dias Shape com louvor!',
-    status: 'Convertido',
-    plano_interesse: 'Desafio 90 Dias Shape',
-    plano_tipo: 'Trimestral',
-    plano_valor: 497,
-    payment_method: 'Boleto',
-    data_inicio: formatDateStr(now - dayMs * 89),
-    data_vencimento: formatDateStr(now + dayMs * 1) // ALERTA: Vence amanhã!
-  }
-];
-
-function getLocalLeads(): LeadAgendamento[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_MOCK_LEADS));
-      return INITIAL_MOCK_LEADS;
-    }
-    return JSON.parse(raw);
-  } catch (err) {
-    console.error('Erro ao ler leads do localStorage:', err);
-    return INITIAL_MOCK_LEADS;
-  }
-}
-
-function saveLocalLeads(leads: LeadAgendamento[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(leads));
-  } catch (err) {
-    console.error('Erro ao salvar leads no localStorage:', err);
-  }
-}
-
 /**
- * Cria um novo agendamento (suporta multi-tenant via trainer_id e inserção anônima segura)
+ * Cria um novo agendamento vinculado estritamente ao trainer_id
  */
 export async function createAgendamento(
   data: Omit<LeadAgendamento, 'id' | 'created_at' | 'status'> & { status?: LeadStatus }
 ): Promise<{ success: boolean; data?: LeadAgendamento; error?: string }> {
-  const currentIso = new Date().toISOString();
-
-  // Valida estritamente se o trainer_id é um UUID para evitar erros de FK e sintaxe no Postgres
-  const candidateTrainerId = 
-    data.trainer_id || 
-    (typeof window !== 'undefined' ? localStorage.getItem('biopersonal_trainer_id') : null) || 
-    import.meta.env.VITE_TRAINER_ID || 
-    profileConfig.id;
-
-  const validTrainerId = isValidUuid(candidateTrainerId) ? candidateTrainerId!.trim() : undefined;
-
-  const newLead: LeadAgendamento = {
-    ...data,
-    trainer_id: validTrainerId,
-    id: 'lead-' + Math.random().toString(36).substring(2, 9),
-    created_at: currentIso,
-    updated_at: currentIso,
-    status: data.status || 'Novo Lead',
-    consentimento_lgpd: data.consentimento_lgpd !== false
-  };
+  if (!data.trainer_id || !isValidUuid(data.trainer_id)) {
+    return { success: false, error: 'Trainer ID inválido para agendamento.' };
+  }
 
   if (supabase) {
     try {
       const payload: Record<string, any> = {
+        trainer_id: data.trainer_id,
         nome: data.nome.trim(),
         whatsapp: data.whatsapp.replace(/\D/g, ''),
         objetivo: data.objetivo,
@@ -249,74 +74,42 @@ export async function createAgendamento(
         consentimento_lgpd: data.consentimento_lgpd !== false
       };
 
-      // Só inclui foreign key trainer_id se for um UUID válido no banco
-      if (validTrainerId) {
-        payload.trainer_id = validTrainerId;
-      }
-
-      // Tentativa 1: Inserção com retorno de representação (.select())
-      const { data: inserted, error: selectError } = await supabase
+      const { data: inserted, error } = await supabase
         .from('leads_agendamentos')
         .insert([payload])
         .select()
-        .maybeSingle();
+        .single();
 
-      if (!selectError && inserted) {
+      if (!error && inserted) {
         return { success: true, data: inserted as LeadAgendamento };
       }
-
-      // Tentativa 2: Se falhar (ex: RLS restringe SELECT para anon gerando 401/42501 no representation),
-      // executa inserção direta (return=minimal) que exige estritamente apenas a permissão de INSERT
-      if (selectError) {
-        console.warn('Tentando inserção direta minimal no Supabase (bypass de select RLS):', selectError);
-        const { error: minimalError } = await supabase
-          .from('leads_agendamentos')
-          .insert([payload]);
-
-        if (!minimalError) {
-          return { success: true, data: newLead };
-        }
-
-        console.error('Falha em ambas as tentativas de inserção no Supabase:', {
-          code: minimalError.code,
-          message: minimalError.message,
-          details: minimalError.details
-        });
+      if (error) {
+        return { success: false, error: error.message };
       }
-    } catch (e) {
-      console.warn('Exceção ao inserir lead no Supabase, acionando fallback local:', e);
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Erro ao registrar agendamento' };
     }
   }
 
-  const current = getLocalLeads();
-  saveLocalLeads([newLead, ...current]);
-  return { success: true, data: newLead };
+  return { success: false, error: 'Supabase não conectado' };
 }
 
 /**
- * Busca leads com ordenação e filtro estrito por trainer_id (multi-tenant)
+ * Busca leads estritamente vinculados ao trainer_id no Supabase.
+ * Nunca retorna leads fictícios de exemplo.
  */
 export async function getLeads(trainerId?: string): Promise<LeadAgendamento[]> {
-  const candidateTrainerId = 
-    trainerId || 
-    (typeof window !== 'undefined' ? localStorage.getItem('biopersonal_trainer_id') : null) || 
-    import.meta.env.VITE_TRAINER_ID || 
-    profileConfig.id;
-
-  const validTrainerId = isValidUuid(candidateTrainerId) ? candidateTrainerId!.trim() : undefined;
+  if (!trainerId || !isValidUuid(trainerId)) {
+    return [];
+  }
 
   if (supabase) {
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('leads_agendamentos')
-        .select('*');
-
-      // Só aplica filtro eq('trainer_id', ...) se for um UUID válido no banco
-      if (validTrainerId) {
-        query = query.eq('trainer_id', validTrainerId);
-      }
-
-      const { data, error } = await query.order('created_at', { ascending: false });
+        .select('*')
+        .eq('trainer_id', trainerId)
+        .order('created_at', { ascending: false });
 
       if (!error && data) {
         return data as LeadAgendamento[];
@@ -325,23 +118,19 @@ export async function getLeads(trainerId?: string): Promise<LeadAgendamento[]> {
         console.error('Erro ao buscar leads no Supabase:', error);
       }
     } catch (e) {
-      console.warn('Supabase erro ao buscar leads, usando localStorage:', e);
+      console.warn('Erro ao buscar leads:', e);
     }
   }
 
-  const local = getLocalLeads();
-  if (validTrainerId) {
-    return local.filter(l => !l.trainer_id || l.trainer_id === validTrainerId);
-  }
-  return local;
+  return [];
 }
 
 /**
- * Atualiza o status do lead
+ * Atualiza o status do lead no Supabase
  */
 export async function updateLeadStatus(id: string, status: LeadStatus): Promise<boolean> {
   const currentIso = new Date().toISOString();
-  
+
   if (supabase) {
     try {
       const { error } = await supabase
@@ -351,18 +140,15 @@ export async function updateLeadStatus(id: string, status: LeadStatus): Promise<
 
       if (!error) return true;
     } catch (e) {
-      console.warn('Supabase erro ao atualizar status, usando local:', e);
+      console.warn('Erro ao atualizar status do lead:', e);
     }
   }
 
-  const leads = getLocalLeads();
-  const updated = leads.map(l => (l.id === id ? { ...l, status, updated_at: currentIso } : l));
-  saveLocalLeads(updated);
-  return true;
+  return false;
 }
 
 /**
- * Atualiza campos detalhados do lead (plano, datas, valor)
+ * Atualiza campos detalhados do lead no Supabase
  */
 export async function updateLeadDetails(id: string, updates: Partial<LeadAgendamento>): Promise<boolean> {
   const currentIso = new Date().toISOString();
@@ -377,18 +163,15 @@ export async function updateLeadDetails(id: string, updates: Partial<LeadAgendam
 
       if (!error) return true;
     } catch (e) {
-      console.warn('Supabase erro ao atualizar detalhes, usando local:', e);
+      console.warn('Erro ao atualizar detalhes do lead:', e);
     }
   }
 
-  const leads = getLocalLeads();
-  const updated = leads.map(l => (l.id === id ? { ...l, ...payload } : l));
-  saveLocalLeads(updated);
-  return true;
+  return false;
 }
 
 /**
- * Exclui um lead
+ * Exclui um lead no Supabase
  */
 export async function deleteLead(id: string): Promise<boolean> {
   if (supabase) {
@@ -400,67 +183,100 @@ export async function deleteLead(id: string): Promise<boolean> {
 
       if (!error) return true;
     } catch (e) {
-      console.warn('Supabase erro ao deletar lead:', e);
+      console.warn('Erro ao deletar lead:', e);
     }
   }
 
-  const leads = getLocalLeads();
-  const filtered = leads.filter(l => l.id !== id);
-  saveLocalLeads(filtered);
-  return true;
+  return false;
 }
 
-const TRAINER_CACHE_KEY = 'biopersonal_trainer_profile_v1';
-
 /**
- * Converte um registro do banco de dados (tabela trainers) para a interface ProfileConfig
+ * Converte um registro do banco de dados (tabela trainers) para a interface ProfileConfig.
+ * Não utiliza nenhum fallback fictício de exemplo.
  */
 export function mapTrainerRowToProfile(data: any): ProfileConfig {
+  const name = data.name || '';
+  const cref = data.cref || '';
+  const phone = data.phone || '';
+  const firstName = name.split(' ')[0] || '';
+  const lastName = name.split(' ').slice(1).join(' ') || '';
+
   return {
     id: data.id,
     user_id: data.user_id || undefined,
     slug: data.slug || undefined,
     data_expiracao: data.data_expiracao || undefined,
     active: data.active !== false,
-    cor_primaria: data.cor_primaria || profileConfig.cor_primaria || '#F97316',
-    cor_fundo: data.cor_fundo || profileConfig.cor_fundo || '#08090C',
-    cor_texto: data.cor_texto || profileConfig.cor_texto || '#F8FAFC',
-    name: data.name || profileConfig.name,
-    role: data.role || profileConfig.role,
-    tagline: data.tagline || data.bio || profileConfig.tagline,
-    cref: data.cref || profileConfig.cref,
-    avatarUrl: data.avatar_url || profileConfig.avatarUrl,
-    bgImageUrl: data.bg_image_url || profileConfig.bgImageUrl,
+    cor_primaria: data.cor_primaria || '#F97316',
+    cor_fundo: data.cor_fundo || '#08090C',
+    cor_texto: data.cor_texto || '#F8FAFC',
+    name: name,
+    role: data.role || 'Personal Trainer',
+    tagline: data.tagline || data.bio || '',
+    cref: cref,
+    avatarUrl: data.avatar_url || '',
+    bgImageUrl: data.bg_image_url || '',
     socialLinks: {
-      whatsapp: data.phone || profileConfig.socialLinks.whatsapp,
-      whatsappDefaultMessage: profileConfig.socialLinks.whatsappDefaultMessage,
-      instagram: data.instagram || profileConfig.socialLinks.instagram,
-      youtube: profileConfig.socialLinks.youtube,
-      strava: profileConfig.socialLinks.strava,
+      whatsapp: phone,
+      whatsappDefaultMessage: 'Olá! Vim pelo seu Biosite e gostaria de saber mais sobre seu acompanhamento.',
+      instagram: data.instagram || '',
+      youtube: '',
+      strava: '',
     },
-    ctaButtons: profileConfig.ctaButtons,
-    services: Array.isArray(data.plans) && data.plans.length > 0 ? data.plans : profileConfig.services,
-    socialProof: (data.social_proof && typeof data.social_proof === 'object' && Object.keys(data.social_proof).length > 0)
-      ? data.social_proof
-      : profileConfig.socialProof,
+    ctaButtons: [
+      {
+        id: 'whatsapp',
+        label: 'Falar no WhatsApp',
+        sublabel: 'Tire dúvidas direto com o Personal',
+        icon: 'MessageCircle',
+        action: 'whatsapp',
+        badge: 'Online agora',
+        highlight: true
+      },
+      {
+        id: 'consultoria',
+        label: 'Planos & Consultoria',
+        sublabel: 'Acompanhamento Exclusivo',
+        icon: 'Dumbbell',
+        action: 'consultoria',
+        badge: 'Vagas Abertas'
+      }
+    ],
+    services: Array.isArray(data.plans) ? data.plans : [],
+    socialProof: (data.social_proof && typeof data.social_proof === 'object') ? data.social_proof : {
+      title: 'Resultados Comprovados',
+      subtitle: '',
+      stats: [],
+      transformations: [],
+      testimonials: []
+    },
     vCardData: {
-      ...profileConfig.vCardData,
-      firstName: data.name?.split(' ')[0] || profileConfig.vCardData.firstName,
-      lastName: data.name?.split(' ').slice(1).join(' ') || profileConfig.vCardData.lastName,
-      phone: data.phone || profileConfig.socialLinks.whatsapp,
-      title: `Personal Trainer - ${data.cref || profileConfig.cref}`,
+      firstName: firstName,
+      lastName: lastName,
+      organization: name ? `${name} Personal Trainer` : 'Personal Trainer',
+      title: cref ? `Personal Trainer - ${cref}` : 'Personal Trainer',
+      phone: phone,
+      email: data.email || '',
+      url: data.slug && typeof window !== 'undefined' ? `${window.location.origin}/p/${data.slug}` : '',
+      note: data.tagline || data.bio || ''
     },
     availableHours: (data.available_hours && typeof data.available_hours === 'object')
       ? data.available_hours
-      : profileConfig.availableHours,
+      : {
+        'Manhã': ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00'],
+        'Tarde': ['14:00', '15:00', '16:00', '17:00'],
+        'Noite': ['18:00', '19:00', '20:00', '21:00']
+      }
   };
 }
 
 /**
- * Busca os dados do treinador no Supabase por Slug (ex: /marcos-silva ou ?p=marcos-silva)
+ * Busca os dados do treinador no Supabase por Slug (ex: /p/personal-demo ou ?p=personal-demo).
+ * Consulta diretamente supabase.from('trainers').select('*').eq('slug', slug).single().
+ * Nunca retorna dados de outro personal caso o slug não exista.
  */
 export async function getTrainerBySlug(slug: string): Promise<ProfileConfig | null> {
-  const cleanSlug = slug.trim().toLowerCase().replace(/^\//, '');
+  const cleanSlug = slug.trim().toLowerCase().replace(/^\/+/, '');
   if (!cleanSlug) return null;
 
   if (supabase) {
@@ -469,32 +285,22 @@ export async function getTrainerBySlug(slug: string): Promise<ProfileConfig | nu
         .from('trainers')
         .select('*')
         .eq('slug', cleanSlug)
-        .limit(1)
-        .maybeSingle();
+        .single();
 
       if (!error && data) {
-        const mapped = mapTrainerRowToProfile(data);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('biopersonal_trainer_id', data.id);
-          localStorage.setItem(TRAINER_CACHE_KEY, JSON.stringify(mapped));
-        }
-        return mapped;
+        return mapTrainerRowToProfile(data);
       }
     } catch (err) {
       console.warn('Erro ao buscar trainer por slug:', err);
     }
   }
 
-  // Fallback se coincidir com o slug do profile padrão
-  if (profileConfig.slug === cleanSlug) {
-    return profileConfig;
-  }
-
   return null;
 }
 
 /**
- * Busca o registro de personal vinculado ao usuário autenticado (user_id do Supabase Auth)
+ * Busca o registro de personal vinculado ao usuário autenticado (user_id do Supabase Auth):
+ * supabase.from('trainers').select('*').eq('user_id', user.id).single()
  */
 export async function getTrainerByUserId(userId: string): Promise<ProfileConfig | null> {
   if (!supabase || !isValidUuid(userId)) return null;
@@ -504,16 +310,10 @@ export async function getTrainerByUserId(userId: string): Promise<ProfileConfig 
       .from('trainers')
       .select('*')
       .eq('user_id', userId)
-      .limit(1)
-      .maybeSingle();
+      .single();
 
     if (!error && data) {
-      const mapped = mapTrainerRowToProfile(data);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('biopersonal_trainer_id', data.id);
-        localStorage.setItem(TRAINER_CACHE_KEY, JSON.stringify(mapped));
-      }
-      return mapped;
+      return mapTrainerRowToProfile(data);
     }
   } catch (err) {
     console.warn('Erro ao buscar trainer por user_id:', err);
@@ -541,9 +341,9 @@ export async function getCurrentAuthUser() {
  */
 export async function signInTrainer(email: string, password: string) {
   if (!supabase) {
-    return { 
-      data: null, 
-      error: { message: 'Supabase não está configurado. Preencha as chaves no arquivo .env.' } 
+    return {
+      data: null,
+      error: { message: 'Supabase não está configurado. Preencha as chaves no arquivo .env.' }
     };
   }
   return await supabase.auth.signInWithPassword({
@@ -562,69 +362,44 @@ export async function signOutTrainer() {
   } catch (err) {
     console.warn('Erro ao deslogar:', err);
   }
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('biopersonal_trainer_id');
-  }
 }
 
 /**
- * Busca os dados do treinador (Tenant) no Supabase de forma dinâmica
- * Fallback para cache local e profileConfig padrão
+ * Busca dados do treinador por ID no Supabase (sem cache local fictício)
  */
-export async function getTrainer(trainerId?: string): Promise<ProfileConfig> {
-  const effectiveId =
-    trainerId ||
-    (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('trainer_id') : null) ||
-    (typeof window !== 'undefined' ? localStorage.getItem('biopersonal_trainer_id') : null) ||
-    import.meta.env.VITE_TRAINER_ID ||
-    profileConfig.id ||
-    undefined;
+export async function getTrainer(trainerId?: string): Promise<ProfileConfig | null> {
+  if (!trainerId || !isValidUuid(trainerId)) return null;
 
   if (supabase) {
     try {
-      let query = supabase.from('trainers').select('*');
-      if (effectiveId && isValidUuid(effectiveId)) {
-        query = query.eq('id', effectiveId);
-      }
-      const { data, error } = await query.limit(1).maybeSingle();
+      const { data, error } = await supabase
+        .from('trainers')
+        .select('*')
+        .eq('id', trainerId)
+        .single();
 
       if (!error && data) {
-        const mappedProfile = mapTrainerRowToProfile(data);
-
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('biopersonal_trainer_id', data.id);
-          localStorage.setItem(TRAINER_CACHE_KEY, JSON.stringify(mappedProfile));
-        }
-
-        return mappedProfile;
+        return mapTrainerRowToProfile(data);
       }
     } catch (err) {
-      console.warn('Erro ao carregar dados do trainer no Supabase, usando fallback:', err);
+      console.warn('Erro ao carregar trainer por ID:', err);
     }
   }
 
-  // Fallback para cache local
-  if (typeof window !== 'undefined') {
-    try {
-      const cached = localStorage.getItem(TRAINER_CACHE_KEY);
-      if (cached) {
-        return JSON.parse(cached);
-      }
-    } catch (e) {
-      // Ignora erro
-    }
-  }
-
-  return profileConfig;
+  return null;
 }
 
 /**
- * Atualiza os dados do treinador no Supabase e reflete em tempo real
+ * Atualiza os dados do treinador no Supabase
  */
 export async function updateTrainer(
   trainerId: string,
   updates: Partial<ProfileConfig>
 ): Promise<{ success: boolean; data?: ProfileConfig; error?: string }> {
+  if (!trainerId || !isValidUuid(trainerId)) {
+    return { success: false, error: 'ID de personal inválido.' };
+  }
+
   const currentIso = new Date().toISOString();
   const payload: Record<string, any> = {
     updated_at: currentIso
@@ -640,6 +415,9 @@ export async function updateTrainer(
   if (updates.slug !== undefined) payload.slug = updates.slug.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
   if (updates.avatarUrl !== undefined) payload.avatar_url = updates.avatarUrl;
   if (updates.bgImageUrl !== undefined) payload.bg_image_url = updates.bgImageUrl;
+  if (updates.cor_primaria !== undefined) payload.cor_primaria = updates.cor_primaria;
+  if (updates.cor_fundo !== undefined) payload.cor_fundo = updates.cor_fundo;
+  if (updates.cor_texto !== undefined) payload.cor_texto = updates.cor_texto;
   if (updates.socialLinks?.whatsapp !== undefined) payload.phone = updates.socialLinks.whatsapp;
   if (updates.socialLinks?.instagram !== undefined) payload.instagram = updates.socialLinks.instagram;
   if (updates.services !== undefined) payload.plans = updates.services;
@@ -647,9 +425,6 @@ export async function updateTrainer(
   if (updates.availableHours !== undefined) payload.available_hours = updates.availableHours;
   if (updates.data_expiracao !== undefined) payload.data_expiracao = updates.data_expiracao;
   if (updates.active !== undefined) payload.active = updates.active;
-  if (updates.cor_primaria !== undefined) payload.cor_primaria = updates.cor_primaria;
-  if (updates.cor_fundo !== undefined) payload.cor_fundo = updates.cor_fundo;
-  if (updates.cor_texto !== undefined) payload.cor_texto = updates.cor_texto;
 
   if (supabase) {
     try {
@@ -662,40 +437,16 @@ export async function updateTrainer(
 
       if (!error && data) {
         const updated = mapTrainerRowToProfile(data);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(TRAINER_CACHE_KEY, JSON.stringify(updated));
-        }
         return { success: true, data: updated };
       }
       if (error) {
         console.error('Erro ao atualizar trainer no Supabase:', error);
+        return { success: false, error: error.message };
       }
     } catch (err: any) {
-      console.error('Exceção ao atualizar trainer:', err);
+      return { success: false, error: err?.message || 'Erro inesperado' };
     }
   }
 
-  // Fallback e cache local
-  if (typeof window !== 'undefined') {
-    try {
-      const cached = localStorage.getItem(TRAINER_CACHE_KEY);
-      const current: ProfileConfig = cached ? JSON.parse(cached) : profileConfig;
-      const merged: ProfileConfig = {
-        ...current,
-        ...updates,
-        socialLinks: {
-          ...current.socialLinks,
-          ...(updates.socialLinks || {})
-        },
-        services: updates.services || current.services,
-        availableHours: updates.availableHours || current.availableHours
-      };
-      localStorage.setItem(TRAINER_CACHE_KEY, JSON.stringify(merged));
-      return { success: true, data: merged };
-    } catch (e: any) {
-      return { success: false, error: e.message };
-    }
-  }
-
-  return { success: true };
+  return { success: false, error: 'Supabase não conectado' };
 }
