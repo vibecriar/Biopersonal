@@ -9,7 +9,7 @@ import { InstagramIcon } from './components/icons/InstagramIcon';
 import { HeaderHero } from './components/HeaderHero';
 import { HeroCTA } from './components/HeroCTA';
 import { QuickLinksGrid } from './components/QuickLinksGrid';
-import { ResultsBanner } from './components/ResultsBanner';
+import { SocialProofSection } from './components/SocialProofSection';
 import { WhyTrainWithMe } from './components/WhyTrainWithMe';
 import { BookingModal } from './components/BookingModal';
 import { ServicesModal } from './components/ServicesModal';
@@ -187,13 +187,8 @@ function AppContent() {
             onOpenServices={() => setIsServicesOpen(true)}
           />
 
-          {/* 4. Banner Prova Social com "Ver Transformações Reais" */}
-          {profile.socialProof?.transformations && profile.socialProof.transformations.length > 0 && (
-            <ResultsBanner
-              profile={profile}
-              onOpenSocialProof={() => setIsSocialProofOpen(true)}
-            />
-          )}
+          {/* 4. Seção "Resultados Reais" com Selo Estilo Google e Cards de Alunos */}
+          <SocialProofSection profile={profile} />
 
           {/* 5. Seção "Por Que Treinar Comigo?" (3 Pilares + CTA de Fechamento de Objeções) */}
           <WhyTrainWithMe

@@ -17,6 +17,8 @@ export const SocialProofModal: React.FC<SocialProofModalProps> = ({
   onOpenBooking
 }) => {
   const { socialProof } = profile;
+  const transformations = socialProof?.transformations || [];
+  const testimonials = socialProof?.testimonials || [];
   const [activeTab, setActiveTab] = useState<'transformacoes' | 'depoimentos'>('transformacoes');
 
   return (
@@ -60,7 +62,7 @@ export const SocialProofModal: React.FC<SocialProofModalProps> = ({
 
             {/* Grid de Estatísticas Vitrificadas */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
-              {socialProof.stats.map((st, i) => (
+              {(socialProof.stats || []).map((st, i) => (
                 <div key={i} className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
                   <div className="text-lg sm:text-xl font-black text-brand-400">{st.value}</div>
                   <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold mt-0.5">{st.label}</div>
@@ -95,8 +97,8 @@ export const SocialProofModal: React.FC<SocialProofModalProps> = ({
             {/* Conteúdo da Aba */}
             {activeTab === 'transformacoes' ? (
               <div className="space-y-4">
-                {(socialProof.transformations || []).length > 0 ? (
-                  socialProof.transformations.map((item) => (
+                {transformations.length > 0 ? (
+                  transformations.map((item) => (
                     <div
                       key={item.id}
                       className="p-4 sm:p-5 rounded-2xl bg-white/5 border border-white/10 hover:border-brand-500/30 transition-all"
@@ -168,8 +170,8 @@ export const SocialProofModal: React.FC<SocialProofModalProps> = ({
               </div>
             ) : (
               <div className="space-y-3">
-                {(socialProof.testimonials || []).length > 0 ? (
-                  socialProof.testimonials.map((dep) => (
+                {testimonials.length > 0 ? (
+                  testimonials.map((dep) => (
                     <div
                       key={dep.id}
                       className="p-4 sm:p-5 rounded-2xl bg-white/5 border border-white/10 flex flex-col justify-between"

@@ -19,10 +19,13 @@ import {
   Check,
   Globe,
   AlertCircle,
-  Palette
+  Palette,
+  Star,
+  Trophy,
+  Edit3
 } from 'lucide-react';
 import { InstagramIcon } from './icons/InstagramIcon';
-import { ProfileConfig, ServicePlan } from '../types';
+import { ProfileConfig, ServicePlan, SocialProofResultItem } from '../types';
 import { compressImage, uploadTrainerImage } from '../lib/imageCompression';
 import { PRESET_PALETTES, isValidHex } from '../lib/theme';
 import { updateTrainerProfileByUserId, getCurrentAuthUser, TrainerUpdatePayload } from '../lib/supabase';
@@ -35,7 +38,7 @@ interface TrainerProfileEditModalProps {
   onShowToast: (msg: string) => void;
 }
 
-type TabKey = 'geral' | 'cores' | 'midias' | 'planos' | 'horarios';
+type TabKey = 'geral' | 'cores' | 'midias' | 'planos' | 'provas' | 'horarios';
 
 export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = ({
   isOpen,
@@ -168,6 +171,135 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
     };
   });
 
+  // Provas Sociais & Resultados de Alunos (coluna social_proof no Supabase)
+  const [socialAtivo, setSocialAtivo] = useState<boolean>(() => {
+    return profile.socialProof?.ativo !== false;
+  });
+  const [socialRating, setSocialRating] = useState<string>(() => {
+    return String(profile.socialProof?.rating || '5.0');
+  });
+  const [socialRatingText, setSocialRatingText] = useState<string>(() => {
+    return profile.socialProof?.ratingText || 'Avaliação 5.0 no Google';
+  });
+  const [socialTotalStudents, setSocialTotalStudents] = useState<string>(() => {
+    return profile.socialProof?.totalStudents || '+ de 300 alunos transformados';
+  });
+  const [socialResults, setSocialResults] = useState<SocialProofResultItem[]>(() => {
+    if (profile.socialProof?.results && profile.socialProof.results.length > 0) {
+      return JSON.parse(JSON.stringify(profile.socialProof.results));
+    }
+    if (profile.socialProof?.transformations && profile.socialProof.transformations.length > 0) {
+      return profile.socialProof.transformations.map(t => ({
+        id: t.id,
+        name: t.name,
+        result: t.result || t.description,
+        photoUrl: t.afterImg || t.beforeImg
+      }));
+    }
+    return [];
+  });
+
+  // Formulário para adicionar / editar card de resultado
+  const [showResultForm, setShowResultForm] = useState(false);
+  const [editingResultId, setEditingResultId] = useState<string | null>(null);
+  const [newResultName, setNewResultName] = useState('');
+  const [newResultText, setNewResultText] = useState('');
+  const [newResultPhoto, setNewResultPhoto] = useState('');
+  const resultFileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingResult, setIsUploadingResult] = useState(false);
+  const [resultUploadProgress, setResultUploadProgress] = useState<string | null>(null);
+
+  // Upload de foto do resultado com compressão WebP para o bucket 'avatars'
+  const handleResultFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingResult(true);
+    setResultUploadProgress('Comprimindo foto...');
+
+    try {
+      const compressed = await compressImage(file, {
+        maxWidth: 1000,
+        maxHeight: 1000,
+        quality: 0.82,
+        format: 'image/webp'
+      });
+
+      setResultUploadProgress(`Enviando (${compressed.formattedCompressedSize})...`);
+      const trainerId = profile.id || profile.user_id || 'trainer';
+      const customName = `resultado_${Date.now()}.webp`;
+      const res = await uploadTrainerImage(trainerId, compressed.blob, 'antes_depois', customName);
+
+      if (res.success && res.publicUrl) {
+        setNewResultPhoto(res.publicUrl);
+        onShowToast('Foto do resultado enviada com sucesso!');
+      } else {
+        alert('Erro no upload: ' + (res.error || 'Verifique se o bucket avatars foi criado no Supabase.'));
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert('Erro ao comprimir imagem: ' + (err?.message || 'Tente novamente.'));
+    } finally {
+      setIsUploadingResult(false);
+      setResultUploadProgress(null);
+      if (resultFileInputRef.current) resultFileInputRef.current.value = '';
+    }
+  };
+
+  const handleSaveResultItem = () => {
+    if (!newResultName.trim()) {
+      alert('Informe o nome do aluno (ex: Carlos M.).');
+      return;
+    }
+    if (!newResultText.trim()) {
+      alert('Informe o resultado conquistado ou depoimento curto do aluno.');
+      return;
+    }
+    if (!newResultPhoto.trim()) {
+      alert('Faça o upload ou informe a foto do resultado.');
+      return;
+    }
+
+    if (editingResultId) {
+      setSocialResults(prev => prev.map(item =>
+        item.id === editingResultId
+          ? { ...item, name: newResultName.trim(), result: newResultText.trim(), photoUrl: newResultPhoto.trim() }
+          : item
+      ));
+      onShowToast('Resultado atualizado na lista!');
+    } else {
+      const newItem: SocialProofResultItem = {
+        id: 'result_' + Date.now(),
+        name: newResultName.trim(),
+        result: newResultText.trim(),
+        photoUrl: newResultPhoto.trim()
+      };
+      setSocialResults(prev => [newItem, ...prev]);
+      onShowToast('Novo resultado adicionado à lista!');
+    }
+
+    setShowResultForm(false);
+    setEditingResultId(null);
+    setNewResultName('');
+    setNewResultText('');
+    setNewResultPhoto('');
+  };
+
+  const handleEditResultItem = (item: SocialProofResultItem) => {
+    setEditingResultId(item.id);
+    setNewResultName(item.name);
+    setNewResultText(item.result);
+    setNewResultPhoto(item.photoUrl);
+    setShowResultForm(true);
+  };
+
+  const handleDeleteResultItem = (id: string) => {
+    if (confirm('Tem certeza que deseja excluir este resultado de aluno?')) {
+      setSocialResults(prev => prev.filter(item => item.id !== id));
+      onShowToast('Resultado removido da lista.');
+    }
+  };
+
   // Sincroniza estados dos campos sempre que o modal abrir ou o perfil atualizar
   React.useEffect(() => {
     if (isOpen) {
@@ -189,6 +321,21 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
         'Tarde': ['14:00', '15:00', '16:00', '17:00'],
         'Noite': ['18:00', '19:00', '20:00', '21:00']
       });
+
+      setSocialAtivo(profile.socialProof?.ativo !== false);
+      setSocialRating(String(profile.socialProof?.rating || '5.0'));
+      setSocialRatingText(profile.socialProof?.ratingText || 'Avaliação 5.0 no Google');
+      setSocialTotalStudents(profile.socialProof?.totalStudents || '+ de 300 alunos transformados');
+      setSocialResults(
+        profile.socialProof?.results && profile.socialProof.results.length > 0
+          ? JSON.parse(JSON.stringify(profile.socialProof.results))
+          : (profile.socialProof?.transformations || []).map(t => ({
+              id: t.id,
+              name: t.name,
+              result: t.result || t.description,
+              photoUrl: t.afterImg || t.beforeImg
+            }))
+      );
     }
   }, [isOpen, profile]);
 
@@ -283,7 +430,14 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
         avatar_url: avatarUrl.trim(),
         bg_image_url: bgImageUrl.trim(),
         plans: services,
-        social_proof: profile.socialProof || {},
+        social_proof: {
+          ...(profile.socialProof || {}),
+          ativo: socialAtivo,
+          rating: socialRating.trim() || '5.0',
+          ratingText: socialRatingText.trim() || 'Avaliação 5.0 no Google',
+          totalStudents: socialTotalStudents.trim() || '+ de 300 alunos transformados',
+          results: socialResults
+        },
         available_hours: availableHours,
         cor_primaria: corPrimaria,
         cor_fundo: corFundo,
@@ -401,6 +555,16 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
               >
                 <CreditCard className="w-3.5 h-3.5" />
                 <span>Planos ({services.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('provas')}
+                className={`flex-1 min-h-[38px] px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === 'provas' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+                  }`}
+              >
+                <Trophy className="w-3.5 h-3.5" />
+                <span>Provas Sociais ({socialResults.length})</span>
               </button>
 
               <button
@@ -1055,7 +1219,321 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
                 </div>
               )}
 
-              {/* ABA 4: GRADE DE HORÁRIOS DISPONÍVEIS */}
+              {/* ABA: PROVAS SOCIAIS & RESULTADOS */}
+              {activeTab === 'provas' && (
+                <div className="space-y-6">
+                  {/* Cabeçalho da Seção com Toggle de Ativação */}
+                  <div className="p-4 sm:p-5 rounded-2xl bg-white/5 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Trophy className="w-5 h-5 text-amber-400" />
+                        <h3 className="font-bold text-sm sm:text-base text-white">
+                          Provas Sociais & Resultados dos Alunos
+                        </h3>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1 max-w-lg">
+                        Gere autoridade exibindo o selo de avaliação estilo Google e fotos com resultados de antes e depois dos seus alunos no Biosite.
+                      </p>
+                    </div>
+
+                    <label className="flex items-center gap-2.5 cursor-pointer self-start sm:self-auto px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 hover:border-brand-500/40 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={socialAtivo}
+                        onChange={(e) => setSocialAtivo(e.target.checked)}
+                        className="w-4 h-4 rounded text-brand-500 focus:ring-brand-500 bg-slate-900 border-white/20 accent-brand-500"
+                      />
+                      <span className="text-xs font-bold text-slate-200">
+                        {socialAtivo ? 'Seção Ativada no Biosite' : 'Seção Oculta no Biosite'}
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* Bloco 1: Métricas Estilo Google Meu Negócio */}
+                  <div className="p-4 sm:p-5 rounded-2xl bg-white/5 border border-white/10 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                        Bloco de Métricas (Estilo Google Meu Negócio)
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Nota em Estrelas (1 a 5)
+                        </label>
+                        <input
+                          type="text"
+                          value={socialRating}
+                          onChange={(e) => setSocialRating(e.target.value)}
+                          placeholder="5.0"
+                          className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-bold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Texto da Avaliação
+                        </label>
+                        <input
+                          type="text"
+                          value={socialRatingText}
+                          onChange={(e) => setSocialRatingText(e.target.value)}
+                          placeholder="Avaliação 5.0 no Google"
+                          className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Número de Alunos Atendidos
+                        </label>
+                        <input
+                          type="text"
+                          value={socialTotalStudents}
+                          onChange={(e) => setSocialTotalStudents(e.target.value)}
+                          placeholder="+ de 300 alunos transformados"
+                          className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Pré-visualização do Selo Google */}
+                    <div className="pt-2">
+                      <span className="text-[11px] font-semibold text-slate-400 mb-2 block">
+                        Pré-visualização do Selo no Biosite:
+                      </span>
+                      <div className="inline-flex items-center gap-3 px-4 py-2 rounded-2xl bg-black/40 border border-white/15 flex-wrap">
+                        <div className="flex items-center gap-1 text-amber-400">
+                          {[...Array(5)].map((_, i) => (
+                            <Star key={i} className="w-3.5 h-3.5 fill-amber-400" />
+                          ))}
+                        </div>
+                        <span className="text-xs font-black text-white">{socialRating || '5.0'}</span>
+                        <span className="text-white/20">•</span>
+                        <span className="text-xs text-slate-300 font-medium">{socialRatingText || 'Avaliação 5.0 no Google'}</span>
+                        <span className="text-white/20">•</span>
+                        <span className="text-xs font-bold text-brand-400">{socialTotalStudents || '+ de 300 alunos transformados'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bloco 2: Lista de Resultados / Antes e Depois */}
+                  <div className="p-4 sm:p-5 rounded-2xl bg-white/5 border border-white/10 space-y-4">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                          <Trophy className="w-4 h-4 text-brand-400" />
+                          Cards de Resultados dos Alunos ({socialResults.length})
+                        </span>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Cadastre as histórias de sucesso e fotos reais dos seus alunos.
+                        </p>
+                      </div>
+
+                      {!showResultForm && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingResultId(null);
+                            setNewResultName('');
+                            setNewResultText('');
+                            setNewResultPhoto('');
+                            setShowResultForm(true);
+                          }}
+                          className="px-3.5 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-md cursor-pointer transition-all"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>+ Adicionar Resultado</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Formulário de Adicionar / Editar Card */}
+                    {showResultForm && (
+                      <div className="p-4 rounded-2xl bg-black/50 border border-brand-500/40 space-y-3">
+                        <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                          <span className="text-xs font-bold text-brand-400">
+                            {editingResultId ? 'Editar Resultado do Aluno' : 'Novo Resultado de Aluno'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowResultForm(false);
+                              setEditingResultId(null);
+                            }}
+                            className="p-1 rounded-lg text-slate-400 hover:text-white"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                              Nome do Aluno
+                            </label>
+                            <input
+                              type="text"
+                              value={newResultName}
+                              onChange={(e) => setNewResultName(e.target.value)}
+                              placeholder="ex: Carlos M."
+                              className="w-full px-3 py-2 rounded-xl glass-input text-xs"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                              Resultado Conquistado / Depoimento Curto
+                            </label>
+                            <input
+                              type="text"
+                              value={newResultText}
+                              onChange={(e) => setNewResultText(e.target.value)}
+                              placeholder="ex: -12kg em 3 meses sem dieta restritiva"
+                              className="w-full px-3 py-2 rounded-xl glass-input text-xs"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Upload de Foto */}
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">
+                            Foto do Resultado (Bucket 'avatars')
+                          </label>
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                            {newResultPhoto ? (
+                              <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-brand-500/40 bg-black/40 shrink-0">
+                                <img
+                                  src={newResultPhoto}
+                                  alt="Preview"
+                                  className="w-full h-full object-cover"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setNewResultPhoto('')}
+                                  className="absolute top-1 right-1 p-1 rounded-full bg-black/80 text-rose-400 hover:text-white"
+                                  title="Remover foto"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ) : null}
+
+                            <div className="flex-1 w-full space-y-2">
+                              <input
+                                ref={resultFileInputRef}
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp,image/jpg"
+                                onChange={handleResultFileSelect}
+                                className="hidden"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => resultFileInputRef.current?.click()}
+                                disabled={isUploadingResult}
+                                className="min-h-[40px] px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 font-bold text-xs flex items-center justify-center gap-2 border border-white/10 transition-colors cursor-pointer w-full sm:w-auto"
+                              >
+                                {isUploadingResult ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin text-brand-400" />
+                                    <span>{resultUploadProgress || 'Enviando foto...'}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Upload className="w-4 h-4 text-brand-400" />
+                                    <span>Selecionar Foto do Dispositivo (WebP)</span>
+                                  </>
+                                )}
+                              </button>
+
+                              <input
+                                type="url"
+                                value={newResultPhoto}
+                                onChange={(e) => setNewResultPhoto(e.target.value)}
+                                placeholder="Ou cole a URL direta da imagem aqui..."
+                                className="w-full px-3 py-1.5 rounded-xl glass-input text-xs"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowResultForm(false);
+                              setEditingResultId(null);
+                            }}
+                            className="px-3 py-1.5 rounded-xl text-xs text-slate-400 hover:text-white cursor-pointer"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSaveResultItem}
+                            className="px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-slate-950 font-bold text-xs uppercase cursor-pointer"
+                          >
+                            {editingResultId ? 'Salvar Edição' : 'Adicionar à Lista'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Lista de Cards Cadastrados */}
+                    {socialResults.length === 0 ? (
+                      <div className="p-6 text-center text-slate-400 bg-white/[0.02] rounded-xl border border-dashed border-white/10">
+                        <Trophy className="w-6 h-6 text-slate-500 mx-auto mb-2" />
+                        <p className="text-xs font-semibold text-slate-300">Nenhum resultado de aluno cadastrado ainda.</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">Clique em "+ Adicionar Resultado" para enviar as fotos e histórias de sucesso.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {socialResults.map((item, index) => (
+                          <div
+                            key={item.id || index}
+                            className="p-3.5 rounded-xl bg-white/5 border border-white/10 flex items-start gap-3 relative group hover:border-brand-500/40 transition-colors"
+                          >
+                            <img
+                              src={item.photoUrl}
+                              alt={item.name}
+                              className="w-16 h-16 rounded-xl object-cover border border-white/10 shrink-0 bg-black/40"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <h4 className="font-bold text-xs text-white truncate">{item.name}</h4>
+                              <p className="text-[11px] text-slate-300 mt-1 line-clamp-2 leading-relaxed">
+                                {item.result}
+                              </p>
+                            </div>
+
+                            <div className="flex flex-col gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleEditResultItem(item)}
+                                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                                title="Editar"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteResultItem(item.id)}
+                                className="p-1.5 rounded-lg bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
+                                title="Excluir"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ABA 5: GRADE DE HORÁRIOS DISPONÍVEIS */}
               {activeTab === 'horarios' && (
                 <div className="space-y-5">
                   <div className="p-3.5 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-xs text-brand-300">

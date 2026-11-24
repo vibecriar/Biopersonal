@@ -34,7 +34,7 @@ export const ResultsBanner: React.FC<ResultsBannerProps> = ({
           <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
             {/* Avatares em pilha com badge de +350 */}
             <div className="flex -space-x-2.5 overflow-hidden p-0.5 shrink-0">
-              {socialProof.transformations.map((item) => (
+              {(socialProof.transformations || []).map((item) => (
                 <img
                   key={item.id}
                   src={item.afterImg}
@@ -42,7 +42,7 @@ export const ResultsBanner: React.FC<ResultsBannerProps> = ({
                   className="inline-block h-10 w-10 sm:h-11 sm:w-11 rounded-full object-cover ring-2 ring-[#08090C] border border-white/20"
                 />
               ))}
-              <div 
+              <div
                 className="flex items-center justify-center h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-brand-500 text-slate-950 font-black text-[11px] sm:text-xs ring-2 ring-[#08090C]"
                 title="+350 Alunos Satisfeitos"
               >

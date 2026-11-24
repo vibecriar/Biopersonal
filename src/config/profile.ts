@@ -25,6 +25,11 @@ export const emptyProfile: ProfileConfig = {
   ctaButtons: [],
   services: [],
   socialProof: {
+    ativo: true,
+    rating: '5.0',
+    ratingText: 'Avaliação 5.0 no Google',
+    totalStudents: '+ de 300 alunos transformados',
+    results: [],
     title: '',
     subtitle: '',
     stats: [],

@@ -244,7 +244,23 @@ export function mapTrainerRowToProfile(data: any): ProfileConfig {
       }
     ],
     services: Array.isArray(data.plans) ? data.plans : [],
-    socialProof: (data.social_proof && typeof data.social_proof === 'object') ? data.social_proof : {
+    socialProof: (data.social_proof && typeof data.social_proof === 'object') ? {
+      ativo: data.social_proof.ativo !== false,
+      rating: data.social_proof.rating || '5.0',
+      ratingText: data.social_proof.ratingText || 'Avaliação 5.0 no Google',
+      totalStudents: data.social_proof.totalStudents || '+ de 300 alunos transformados',
+      results: Array.isArray(data.social_proof.results) ? data.social_proof.results : [],
+      title: data.social_proof.title || 'Resultados Comprovados',
+      subtitle: data.social_proof.subtitle || '',
+      stats: Array.isArray(data.social_proof.stats) ? data.social_proof.stats : [],
+      transformations: Array.isArray(data.social_proof.transformations) ? data.social_proof.transformations : [],
+      testimonials: Array.isArray(data.social_proof.testimonials) ? data.social_proof.testimonials : []
+    } : {
+      ativo: true,
+      rating: '5.0',
+      ratingText: 'Avaliação 5.0 no Google',
+      totalStudents: '+ de 300 alunos transformados',
+      results: [],
       title: 'Resultados Comprovados',
       subtitle: '',
       stats: [],
@@ -503,7 +519,7 @@ export async function updateTrainer(
     try {
       // Tenta atualizar por user_id primeiro, senão por id
       let query = supabase.from('trainers').update(payload);
-      
+
       const resUser = await query.eq('user_id', trainerIdOrUserId).select().single();
       if (!resUser.error && resUser.data) {
         return { success: true, data: mapTrainerRowToProfile(resUser.data) };

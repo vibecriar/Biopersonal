@@ -44,12 +44,24 @@ export interface TestimonialItem {
   rating: number;
 }
 
+export interface SocialProofResultItem {
+  id: string;
+  name: string; // ex: "Carlos M."
+  result: string; // ex: "-12kg em 3 meses sem dieta restritiva"
+  photoUrl: string; // URL da foto do resultado no bucket avatars
+}
+
 export interface SocialProofData {
-  title: string;
-  subtitle: string;
-  stats: Array<{ label: string; value: string }>;
-  transformations: TransformationItem[];
-  testimonials: TestimonialItem[];
+  ativo?: boolean; // Chave ativar/desativar exibição da seção no Biosite
+  rating?: string | number; // Nota em estrelas (ex: "5.0")
+  ratingText?: string; // Texto de avaliação (ex: "Avaliação 5.0 no Google" ou "Satisfação máxima")
+  totalStudents?: string; // Número de alunos atendidos (ex: "+ de 300 alunos transformados")
+  results?: SocialProofResultItem[]; // Lista de cards de resultados com foto
+  title?: string;
+  subtitle?: string;
+  stats?: Array<{ label: string; value: string }>;
+  transformations?: TransformationItem[];
+  testimonials?: TestimonialItem[];
 }
 
 export interface VCardData {
