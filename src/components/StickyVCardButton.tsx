@@ -31,7 +31,7 @@ export const StickyVCardButton: React.FC<StickyVCardButtonProps> = ({
         transition={{ duration: 0.5, delay: 0.35 }}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.97 }}
-        className="w-full relative overflow-hidden flex items-center justify-center gap-3 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-brand-500 via-amber-500 to-brand-600 text-slate-950 font-black text-sm sm:text-base uppercase tracking-wider shadow-[0_10px_30px_rgba(255,122,0,0.35)] hover:shadow-[0_12px_40px_rgba(255,122,0,0.5)] transition-all duration-300 border border-amber-300/40 cursor-pointer"
+        className="w-full relative overflow-hidden flex items-center justify-center gap-3 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-brand-500 via-brand-400 to-brand-600 text-slate-950 font-black text-sm sm:text-base uppercase tracking-wider shadow-[0_10px_30px_rgba(var(--brand-500-rgb,249_115_22),0.35)] hover:shadow-[0_12px_40px_rgba(var(--brand-500-rgb,249_115_22),0.5)] transition-all duration-300 border border-brand-400/40 cursor-pointer"
       >
         {/* Shimmer de reflexo passando */}
         <div className="absolute inset-0 -translate-x-full hover:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/25 to-transparent"></div>

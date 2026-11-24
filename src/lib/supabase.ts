@@ -192,12 +192,13 @@ export async function deleteLead(id: string): Promise<boolean> {
 
 /**
  * Converte um registro do banco de dados (tabela trainers) para a interface ProfileConfig.
- * Não utiliza nenhum fallback fictício de exemplo.
+ * Mapeia as colunas reais da tabela (nome, slug, cref, whatsapp, role, tagline, instagram,
+ * avatar_url, bg_image_url, plans, social_proof, available_hours, cor_primaria, cor_fundo, cor_texto).
  */
 export function mapTrainerRowToProfile(data: any): ProfileConfig {
-  const name = data.name || '';
+  const name = data.nome || data.name || '';
   const cref = data.cref || '';
-  const phone = data.phone || '';
+  const phone = data.whatsapp || data.phone || '';
   const firstName = name.split(' ')[0] || '';
   const lastName = name.split(' ').slice(1).join(' ') || '';
 
@@ -389,59 +390,132 @@ export async function getTrainer(trainerId?: string): Promise<ProfileConfig | nu
   return null;
 }
 
+export interface TrainerUpdatePayload {
+  nome: string;
+  slug: string;
+  cref: string;
+  whatsapp: string;
+  role: string;
+  tagline: string;
+  instagram: string;
+  avatar_url: string;
+  bg_image_url: string;
+  plans: any;
+  social_proof: any;
+  available_hours: any;
+  cor_primaria: string;
+  cor_fundo: string;
+  cor_texto: string;
+}
+
 /**
- * Atualiza os dados do treinador no Supabase
+ * Atualiza o perfil do personal trainer no Supabase usando EXCLUSIVAMENTE o user_id autenticado
+ * e enviando apenas as 15 colunas exatas da tabela trainers:
+ * nome, slug, cref, whatsapp, role, tagline, instagram, avatar_url, bg_image_url,
+ * plans, social_proof, available_hours, cor_primaria, cor_fundo, cor_texto.
+ * Filtrando estritamente por .eq('user_id', user.id).
+ */
+export async function updateTrainerProfileByUserId(
+  userId: string,
+  payload: TrainerUpdatePayload
+): Promise<{ success: boolean; data?: ProfileConfig; error?: string }> {
+  if (!supabase) {
+    return { success: false, error: 'Supabase não está configurado no ambiente.' };
+  }
+
+  if (!userId || !isValidUuid(userId)) {
+    return { success: false, error: 'Identificador de usuário (user_id) inválido ou ausente.' };
+  }
+
+  // Prepara exatamente as 15 colunas existentes na tabela trainers
+  const exactPayload = {
+    nome: payload.nome ?? '',
+    slug: payload.slug ?? '',
+    cref: payload.cref ?? '',
+    whatsapp: payload.whatsapp ?? '',
+    role: payload.role ?? '',
+    tagline: payload.tagline ?? '',
+    instagram: payload.instagram ?? '',
+    avatar_url: payload.avatar_url ?? '',
+    bg_image_url: payload.bg_image_url ?? '',
+    plans: Array.isArray(payload.plans) ? payload.plans : [],
+    social_proof: (payload.social_proof && typeof payload.social_proof === 'object') ? payload.social_proof : {},
+    available_hours: (payload.available_hours && typeof payload.available_hours === 'object') ? payload.available_hours : {},
+    cor_primaria: payload.cor_primaria || '#F97316',
+    cor_fundo: payload.cor_fundo || '#08090C',
+    cor_texto: payload.cor_texto || '#F8FAFC'
+  };
+
+  try {
+    const { data, error } = await supabase
+      .from('trainers')
+      .update(exactPayload)
+      .eq('user_id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro no Supabase ao atualizar (.eq user_id):', error);
+      return { success: false, error: error.message };
+    }
+
+    if (data) {
+      return { success: true, data: mapTrainerRowToProfile(data) };
+    }
+
+    return { success: false, error: 'Nenhum registro encontrado para atualizar com este user_id.' };
+  } catch (err: any) {
+    console.error('Exceção ao atualizar perfil por user_id:', err);
+    return { success: false, error: err?.message || 'Erro inesperado ao salvar perfil.' };
+  }
+}
+
+/**
+ * Atualiza os dados do treinador no Supabase por ID ou user_id
  */
 export async function updateTrainer(
-  trainerId: string,
+  trainerIdOrUserId: string,
   updates: Partial<ProfileConfig>
 ): Promise<{ success: boolean; data?: ProfileConfig; error?: string }> {
-  if (!trainerId || !isValidUuid(trainerId)) {
+  if (!trainerIdOrUserId || !isValidUuid(trainerIdOrUserId)) {
     return { success: false, error: 'ID de personal inválido.' };
   }
 
-  const currentIso = new Date().toISOString();
-  const payload: Record<string, any> = {
-    updated_at: currentIso
-  };
+  const payload: Record<string, any> = {};
 
-  if (updates.name !== undefined) payload.name = updates.name;
+  if (updates.name !== undefined) payload.nome = updates.name;
   if (updates.role !== undefined) payload.role = updates.role;
   if (updates.cref !== undefined) payload.cref = updates.cref;
-  if (updates.tagline !== undefined) {
-    payload.tagline = updates.tagline;
-    payload.bio = updates.tagline;
-  }
+  if (updates.tagline !== undefined) payload.tagline = updates.tagline;
   if (updates.slug !== undefined) payload.slug = updates.slug.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
   if (updates.avatarUrl !== undefined) payload.avatar_url = updates.avatarUrl;
   if (updates.bgImageUrl !== undefined) payload.bg_image_url = updates.bgImageUrl;
   if (updates.cor_primaria !== undefined) payload.cor_primaria = updates.cor_primaria;
   if (updates.cor_fundo !== undefined) payload.cor_fundo = updates.cor_fundo;
   if (updates.cor_texto !== undefined) payload.cor_texto = updates.cor_texto;
-  if (updates.socialLinks?.whatsapp !== undefined) payload.phone = updates.socialLinks.whatsapp;
+  if (updates.socialLinks?.whatsapp !== undefined) payload.whatsapp = updates.socialLinks.whatsapp;
   if (updates.socialLinks?.instagram !== undefined) payload.instagram = updates.socialLinks.instagram;
   if (updates.services !== undefined) payload.plans = updates.services;
   if (updates.socialProof !== undefined) payload.social_proof = updates.socialProof;
   if (updates.availableHours !== undefined) payload.available_hours = updates.availableHours;
-  if (updates.data_expiracao !== undefined) payload.data_expiracao = updates.data_expiracao;
-  if (updates.active !== undefined) payload.active = updates.active;
 
   if (supabase) {
     try {
-      const { data, error } = await supabase
-        .from('trainers')
-        .update(payload)
-        .eq('id', trainerId)
-        .select()
-        .single();
-
-      if (!error && data) {
-        const updated = mapTrainerRowToProfile(data);
-        return { success: true, data: updated };
+      // Tenta atualizar por user_id primeiro, senão por id
+      let query = supabase.from('trainers').update(payload);
+      
+      const resUser = await query.eq('user_id', trainerIdOrUserId).select().single();
+      if (!resUser.error && resUser.data) {
+        return { success: true, data: mapTrainerRowToProfile(resUser.data) };
       }
-      if (error) {
-        console.error('Erro ao atualizar trainer no Supabase:', error);
-        return { success: false, error: error.message };
+
+      const resId = await supabase.from('trainers').update(payload).eq('id', trainerIdOrUserId).select().single();
+      if (!resId.error && resId.data) {
+        return { success: true, data: mapTrainerRowToProfile(resId.data) };
+      }
+
+      if (resUser.error) {
+        return { success: false, error: resUser.error.message };
       }
     } catch (err: any) {
       return { success: false, error: err?.message || 'Erro inesperado' };

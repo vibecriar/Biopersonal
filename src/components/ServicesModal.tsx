@@ -72,7 +72,7 @@ export const ServicesModal: React.FC<ServicesModalProps> = ({
                   }`}
                 >
                   {plan.popular && (
-                    <span className="absolute -top-3 left-5 bg-gradient-to-r from-brand-500 to-amber-500 text-slate-950 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1">
+                    <span className="absolute -top-3 left-5 bg-gradient-to-r from-brand-500 to-brand-400 text-slate-950 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1">
                       <Sparkles className="w-3 h-3" />
                       {plan.tag}
                     </span>
@@ -107,7 +107,7 @@ export const ServicesModal: React.FC<ServicesModalProps> = ({
                         onClose();
                         onSelectServiceForBooking(plan.name);
                       }}
-                      className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-brand-500 to-amber-500 hover:from-brand-600 hover:to-amber-600 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-brand-500/25 transition-all cursor-pointer min-h-[48px]"
+                      className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-brand-500 to-brand-400 hover:from-brand-600 hover:to-brand-500 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-brand-500/25 transition-all cursor-pointer min-h-[48px]"
                     >
                       <Sparkles className="w-4 h-4 fill-slate-950" />
                       <span>Quero esta vaga</span>

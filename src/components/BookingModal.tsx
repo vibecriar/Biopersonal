@@ -502,7 +502,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   <button
                     type="submit"
                     disabled={isLoading || !horario || !lgpdConsent}
-                    className="w-full mt-2 py-3.5 px-6 rounded-xl bg-gradient-to-r from-brand-500 to-amber-500 hover:from-brand-600 hover:to-amber-600 text-slate-950 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-brand-500/25 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full mt-2 py-3.5 px-6 rounded-xl bg-gradient-to-r from-brand-500 to-brand-400 hover:from-brand-600 hover:to-brand-500 text-slate-950 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-brand-500/25 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isLoading ? (
                       <>

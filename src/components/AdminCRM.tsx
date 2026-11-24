@@ -167,18 +167,14 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
   };
 
   const handleSaveProfile = async (updates: Partial<ProfileConfig>): Promise<boolean> => {
+    setActiveProfile(prev => ({ ...prev, ...updates }));
+    if (onSetContextProfile) {
+      onSetContextProfile({ ...activeProfile, ...updates });
+    }
     if (onUpdateProfile) {
-      const ok = await onUpdateProfile(updates);
-      if (ok) {
-        setActiveProfile(prev => ({ ...prev, ...updates }));
-      }
-      return ok;
+      await onUpdateProfile(updates);
     }
-    const res = await updateTrainer(activeProfile.id || profile.id || 'default', updates);
-    if (res.success && res.data) {
-      setActiveProfile(res.data);
-    }
-    return res.success;
+    return true;
   };
 
   // Campos para novo lead manual

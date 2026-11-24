@@ -115,27 +115,21 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     fetchProfile();
   }, [currentSlug]);
 
-  // Aplica as cores dinâmicas no documento sempre que o perfil mudar
+  // Aplica as cores dinâmicas no documento sempre que o perfil mudar (no Biosite e no CRM)
   useEffect(() => {
-    if (profile && profile.id) {
+    if (profile) {
       applyTheme({
         cor_primaria: profile.cor_primaria,
         cor_fundo: profile.cor_fundo,
         cor_texto: profile.cor_texto
       });
     }
-  }, [profile?.cor_primaria, profile?.cor_fundo, profile?.cor_texto, profile?.id]);
+  }, [profile?.cor_primaria, profile?.cor_fundo, profile?.cor_texto]);
 
   const updateProfileData = async (updates: Partial<ProfileConfig>): Promise<boolean> => {
     try {
-      const trainerId = profile.id;
-      if (!trainerId) return false;
-      const result = await updateTrainer(trainerId, updates);
-      if (result.success && result.data) {
-        setProfile(result.data);
-        return true;
-      }
-      return false;
+      setProfile(prev => ({ ...prev, ...updates }));
+      return true;
     } catch (err) {
       console.error('Erro ao atualizar perfil no contexto:', err);
       return false;

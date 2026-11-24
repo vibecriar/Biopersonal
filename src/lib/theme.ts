@@ -50,16 +50,25 @@ export const PRESET_PALETTES: ColorPalette[] = [
   }
 ];
 
+export function normalizeHex(hex?: string): string | null {
+  if (!hex) return null;
+  let clean = hex.trim();
+  if (!clean.startsWith('#')) {
+    clean = `#${clean}`;
+  }
+  return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(clean) ? clean : null;
+}
+
 export function isValidHex(hex?: string): boolean {
-  if (!hex) return false;
-  return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(hex.trim());
+  return normalizeHex(hex) !== null;
 }
 
 export function hexToRgb(hex?: string): { r: number; g: number; b: number; rgbString: string } {
   const fallback = { r: 249, g: 115, b: 22, rgbString: '249 115 22' };
-  if (!hex) return fallback;
+  const normalized = normalizeHex(hex);
+  if (!normalized) return fallback;
 
-  let clean = hex.replace('#', '').trim();
+  let clean = normalized.replace('#', '').trim();
   if (clean.length === 3) {
     clean = clean.split('').map(c => c + c).join('');
   }
@@ -93,9 +102,9 @@ export function applyTheme(colors: {
 }) {
   if (typeof document === 'undefined') return;
 
-  const primary = isValidHex(colors.cor_primaria) ? colors.cor_primaria! : '#F97316';
-  const bg = isValidHex(colors.cor_fundo) ? colors.cor_fundo! : '#08090C';
-  const text = isValidHex(colors.cor_texto) ? colors.cor_texto! : '#F8FAFC';
+  const primary = normalizeHex(colors.cor_primaria) || '#F97316';
+  const bg = normalizeHex(colors.cor_fundo) || '#08090C';
+  const text = normalizeHex(colors.cor_texto) || '#F8FAFC';
 
   const { r, g, b, rgbString: primaryRgb } = hexToRgb(primary);
   const primaryLight = adjustBrightness(primary, 15);

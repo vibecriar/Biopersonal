@@ -25,6 +25,7 @@ import { InstagramIcon } from './icons/InstagramIcon';
 import { ProfileConfig, ServicePlan } from '../types';
 import { compressImage, uploadTrainerImage } from '../lib/imageCompression';
 import { PRESET_PALETTES, isValidHex } from '../lib/theme';
+import { updateTrainerProfileByUserId, getCurrentAuthUser, TrainerUpdatePayload } from '../lib/supabase';
 
 interface TrainerProfileEditModalProps {
   isOpen: boolean;
@@ -167,6 +168,30 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
     };
   });
 
+  // Sincroniza estados dos campos sempre que o modal abrir ou o perfil atualizar
+  React.useEffect(() => {
+    if (isOpen) {
+      setName(profile.name || '');
+      setRole(profile.role || '');
+      setCref(profile.cref || '');
+      setSlug(profile.slug || '');
+      setTagline(profile.tagline || '');
+      setWhatsapp(profile.socialLinks?.whatsapp || '');
+      setInstagram(profile.socialLinks?.instagram || '');
+      setAvatarUrl(profile.avatarUrl || '');
+      setBgImageUrl(profile.bgImageUrl || '');
+      setCorPrimaria(profile.cor_primaria || '#F97316');
+      setCorFundo(profile.cor_fundo || '#08090C');
+      setCorTexto(profile.cor_texto || '#F8FAFC');
+      setServices(profile.services ? JSON.parse(JSON.stringify(profile.services)) : []);
+      setAvailableHours(profile.availableHours ? JSON.parse(JSON.stringify(profile.availableHours)) : {
+        'Manhã': ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00'],
+        'Tarde': ['14:00', '15:00', '16:00', '17:00'],
+        'Noite': ['18:00', '19:00', '20:00', '21:00']
+      });
+    }
+  }, [isOpen, profile]);
+
   // Input para adicionar novo horário
   const [newHourInput, setNewHourInput] = useState('');
   const [selectedShiftForNewHour, setSelectedShiftForNewHour] = useState<'Manhã' | 'Tarde' | 'Noite'>('Manhã');
@@ -236,34 +261,51 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
     setIsSaving(true);
 
     try {
-      const updates: Partial<ProfileConfig> = {
-        name: name.trim(),
-        role: role.trim(),
-        cref: cref.trim(),
+      // 1. Obtém o user.id autenticado do Supabase
+      const authUser = await getCurrentAuthUser();
+      const userId = authUser?.id || profile.user_id;
+
+      if (!userId) {
+        alert('Usuário não autenticado no Supabase. Faça login no CRM para salvar alterações.');
+        setIsSaving(false);
+        return;
+      }
+
+      // 2. Monta EXATAMENTE e APENAS as 15 colunas da tabela trainers
+      const exactPayload: TrainerUpdatePayload = {
+        nome: name.trim(),
         slug: slug.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-'),
+        cref: cref.trim(),
+        whatsapp: whatsapp.replace(/\D/g, ''),
+        role: role.trim(),
         tagline: tagline.trim(),
-        avatarUrl: avatarUrl.trim(),
-        bgImageUrl: bgImageUrl.trim(),
+        instagram: instagram.trim(),
+        avatar_url: avatarUrl.trim(),
+        bg_image_url: bgImageUrl.trim(),
+        plans: services,
+        social_proof: profile.socialProof || {},
+        available_hours: availableHours,
         cor_primaria: corPrimaria,
         cor_fundo: corFundo,
-        cor_texto: corTexto,
-        socialLinks: {
-          ...profile.socialLinks,
-          whatsapp: whatsapp.replace(/\D/g, ''),
-          instagram: instagram.trim()
-        },
-        services,
-        availableHours
+        cor_texto: corTexto
       };
 
-      const success = await onSaveProfile(updates);
+      // 3. Executa o .update() enviando apenas essas colunas exatas filtrando por .eq('user_id', user.id)
+      const res = await updateTrainerProfileByUserId(userId, exactPayload);
 
-      if (success) {
-        onShowToast('Perfil atualizado com sucesso no Supabase! As alterações já estão ao vivo no Biosite.');
-        onClose();
-      } else {
-        alert('Não foi possível salvar no Supabase. Verifique sua conexão e tente novamente.');
+      if (!res.success || !res.data) {
+        // Se der algum erro no Supabase, exibe um alert(error.message) na tela para sabermos na hora
+        alert(res.error || 'Erro ao atualizar dados no Supabase.');
+        setIsSaving(false);
+        return;
       }
+
+      // 4. Sucesso: propaga o perfil atualizado para o CRM e contexto
+      if (onSaveProfile) {
+        await onSaveProfile(res.data);
+      }
+      onShowToast('Perfil atualizado com sucesso no Supabase! As alterações já estão ao vivo no Biosite.');
+      onClose();
     } catch (err: any) {
       console.error(err);
       alert('Erro ao salvar alterações: ' + (err?.message || 'Tente novamente.'));

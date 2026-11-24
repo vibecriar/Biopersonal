@@ -10,10 +10,12 @@ CREATE TABLE IF NOT EXISTS public.trainers (
     slug TEXT UNIQUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    name TEXT NOT NULL,
+    nome TEXT,
+    name TEXT,
     email TEXT UNIQUE,
     role TEXT DEFAULT 'Personal Trainer & Consultoria de Alta Performance',
     cref TEXT,
+    whatsapp TEXT,
     phone TEXT,
     avatar_url TEXT,
     bg_image_url TEXT,
@@ -65,6 +67,12 @@ DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'trainers' AND column_name = 'user_id') THEN
         ALTER TABLE public.trainers ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'trainers' AND column_name = 'nome') THEN
+        ALTER TABLE public.trainers ADD COLUMN nome TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'trainers' AND column_name = 'whatsapp') THEN
+        ALTER TABLE public.trainers ADD COLUMN whatsapp TEXT;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'trainers' AND column_name = 'slug') THEN
         ALTER TABLE public.trainers ADD COLUMN slug TEXT;

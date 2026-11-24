@@ -141,7 +141,13 @@ function AppContent() {
   const whatsappUrl = `https://wa.me/${(profile.socialLinks?.whatsapp || '').replace(/\D/g, '')}?text=${encodeURIComponent(profile.socialLinks?.whatsappDefaultMessage || 'Olá!')}`;
 
   return (
-    <div className="relative min-h-screen text-slate-100 flex flex-col justify-between selection:bg-brand-500 selection:text-white">
+    <div
+      className="relative min-h-screen flex flex-col justify-between selection:bg-brand-500 selection:text-white"
+      style={{
+        backgroundColor: profile.cor_fundo || '#08090C',
+        color: profile.cor_texto || '#F8FAFC'
+      }}
+    >
       {/* Background Escuro com Foto de Academia e Overlay Vitrificado Dinâmico */}
       <div
         className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none z-0 transform scale-105"

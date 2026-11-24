@@ -140,7 +140,7 @@ export const SocialProofModal: React.FC<SocialProofModalProps> = ({
                             className="w-full h-full object-cover"
                             loading="lazy"
                           />
-                          <span className="absolute bottom-2 left-2 px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-brand-500 to-amber-500 text-[10px] font-black text-slate-950 shadow-md">
+                          <span className="absolute bottom-2 left-2 px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-brand-500 to-brand-400 text-[10px] font-black text-slate-950 shadow-md">
                             Depois
                           </span>
                         </div>
@@ -212,7 +212,7 @@ export const SocialProofModal: React.FC<SocialProofModalProps> = ({
                   onClose();
                   onOpenBooking();
                 }}
-                className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-brand-500 via-amber-500 to-brand-600 hover:from-brand-600 hover:to-amber-600 text-slate-950 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2.5 shadow-lg shadow-brand-500/30 transition-all cursor-pointer min-h-[52px]"
+                className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-brand-500 via-brand-400 to-brand-600 hover:from-brand-600 hover:to-brand-500 text-slate-950 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2.5 shadow-lg shadow-brand-500/30 transition-all cursor-pointer min-h-[52px]"
               >
                 <Flame className="w-4 h-4 fill-slate-950" />
                 <span>Quero resultados como esse</span>
