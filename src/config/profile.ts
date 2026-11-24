@@ -7,6 +7,9 @@ import { ProfileConfig } from '../types';
 export const profileConfig: ProfileConfig = {
   // ID do Personal (Tenant) configurável via variável de ambiente ou ID padrão
   id: import.meta.env.VITE_TRAINER_ID || undefined,
+  slug: "rodrigo-thor",
+  data_expiracao: "2027-12-31",
+  active: true,
   name: "Rodrigo 'Thor' Silveira",
   role: "Personal Trainer & Consultoria de Alta Performance",
   cref: "CREF 084920-G/SP",

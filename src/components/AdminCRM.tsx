@@ -31,7 +31,14 @@ import {
   Send,
   SlidersHorizontal,
   ChevronDown,
-  X
+  X,
+  Mail,
+  Eye,
+  EyeOff,
+  LogOut,
+  ExternalLink,
+  AlertCircle,
+  UserCheck
 } from 'lucide-react';
 import { LeadAgendamento, LeadStatus, ProfileConfig, PaymentMethod } from '../types';
 import { 
@@ -40,7 +47,11 @@ import {
   updateLeadDetails, 
   deleteLead, 
   createAgendamento, 
-  isSupabaseConfigured 
+  isSupabaseConfigured,
+  signInTrainer,
+  signOutTrainer,
+  getCurrentAuthUser,
+  getTrainerByUserId
 } from '../lib/supabase';
 import { exportLeadsToVCard, exportLeadsToCSV } from '../lib/vcard';
 import { ReactivationTemplatesModal } from './ReactivationTemplatesModal';
@@ -54,6 +65,7 @@ interface AdminCRMProps {
   onExit: () => void;
   onShowToast: (msg: string) => void;
   onUpdateProfile?: (updates: Partial<ProfileConfig>) => Promise<boolean>;
+  onSetContextProfile?: (profile: ProfileConfig) => void;
 }
 
 const STATUS_COLUMNS: Array<{ id: LeadStatus; label: string; shortLabel: string; color: string; badge: string }> = [
@@ -67,11 +79,42 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
   profile,
   onExit,
   onShowToast,
-  onUpdateProfile
+  onUpdateProfile,
+  onSetContextProfile
 }) => {
+  const [activeProfile, setActiveProfile] = useState<ProfileConfig>(profile);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [pinInput, setPinInput] = useState('');
-  const [pinError, setPinError] = useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+
+  // Estados de Autenticação Supabase Auth (E-mail e Senha)
+  const [emailInput, setEmailInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+
+  // Verifica se o personal já possui sessão ativa no Supabase Auth
+  useEffect(() => {
+    let isMounted = true;
+    const checkInitialSession = async () => {
+      try {
+        const user = await getCurrentAuthUser();
+        if (user && isMounted) {
+          setIsAuthenticated(true);
+          setCurrentUserEmail(user.email || null);
+          const userTrainer = await getTrainerByUserId(user.id);
+          if (userTrainer && isMounted) {
+            setActiveProfile(userTrainer);
+            if (onSetContextProfile) onSetContextProfile(userTrainer);
+          }
+        }
+      } catch (err) {
+        console.warn('Erro ao verificar sessão Supabase:', err);
+      }
+    };
+    checkInitialSession();
+    return () => { isMounted = false; };
+  }, []);
 
   const [leads, setLeads] = useState<LeadAgendamento[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -107,9 +150,16 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
 
   const handleSaveProfile = async (updates: Partial<ProfileConfig>): Promise<boolean> => {
     if (onUpdateProfile) {
-      return await onUpdateProfile(updates);
+      const ok = await onUpdateProfile(updates);
+      if (ok) {
+        setActiveProfile(prev => ({ ...prev, ...updates }));
+      }
+      return ok;
     }
-    const res = await updateTrainer(profile.id || 'default', updates);
+    const res = await updateTrainer(activeProfile.id || profile.id || 'default', updates);
+    if (res.success && res.data) {
+      setActiveProfile(res.data);
+    }
     return res.success;
   };
 
@@ -123,23 +173,51 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
   const [newTurno, setNewTurno] = useState<'Manhã' | 'Tarde' | 'Noite'>('Manhã');
   const [newObs, setNewObs] = useState('');
 
-  const targetPin = import.meta.env.VITE_ADMIN_PIN || '1234';
   const supabaseActive = isSupabaseConfigured();
 
-  const handleLogin = (e: React.FormEvent) => {
+  // Login com E-mail e Senha no Supabase Auth
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pinInput.trim() === targetPin) {
+    setAuthError(null);
+    setIsAuthenticating(true);
+
+    try {
+      const { data, error } = await signInTrainer(emailInput, passwordInput);
+      if (error || !data?.user) {
+        setAuthError(error?.message || 'E-mail ou senha incorretos.');
+        return;
+      }
+
       setIsAuthenticated(true);
-      setPinError(false);
-    } else {
-      setPinError(true);
+      setCurrentUserEmail(data.user.email || null);
+
+      // Carrega exclusivamente a linha do personal logado
+      const userTrainer = await getTrainerByUserId(data.user.id);
+      if (userTrainer) {
+        setActiveProfile(userTrainer);
+        if (onSetContextProfile) onSetContextProfile(userTrainer);
+      }
+
+      onShowToast('Autenticado com sucesso no Painel do Personal!');
+    } catch (err: any) {
+      setAuthError(err?.message || 'Erro inesperado ao realizar login.');
+    } finally {
+      setIsAuthenticating(false);
     }
+  };
+
+  // Logout seguro
+  const handleLogout = async () => {
+    await signOutTrainer();
+    setIsAuthenticated(false);
+    setCurrentUserEmail(null);
+    onShowToast('Sessão encerrada com sucesso.');
   };
 
   const loadLeads = async () => {
     setIsLoading(true);
     try {
-      const activeTrainerId = profile.id;
+      const activeTrainerId = activeProfile.id || profile.id;
       const data = await getLeads(activeTrainerId);
       setLeads(data);
     } catch (e) {
@@ -214,7 +292,7 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
   const buildSmartWhatsAppLink = (lead: LeadAgendamento): string => {
     const cleanPhone = lead.whatsapp.replace(/\D/g, '');
     const firstName = lead.nome.trim().split(' ')[0];
-    const trainerName = profile.name.split(' ')[0];
+    const trainerName = (activeProfile.name || profile.name).split(' ')[0];
     const dateFormatted = lead.data_preferencia ? lead.data_preferencia.split('-').reverse().join('/') : '';
     const planName = lead.plano_interesse || 'Consultoria';
 
@@ -388,67 +466,125 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
     }
   };
 
-  // Se não autenticado, exibe tela de login / PIN
+  // Se não autenticado, exibe tela de login oficial com Supabase Auth (E-mail e Senha)
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-[#08090C]">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-[#08090C] selection:bg-brand-500 selection:text-white">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-sm glass-modal rounded-3xl p-7 text-center border border-white/15 shadow-2xl"
+          className="w-full max-w-md glass-modal rounded-3xl p-6 sm:p-8 text-center border border-white/15 shadow-2xl relative overflow-hidden"
         >
+          {/* Glow decorativo */}
+          <div className="absolute -top-12 -right-12 w-32 h-32 bg-brand-500/20 rounded-full blur-2xl pointer-events-none" />
+
           <div className="inline-flex p-3 rounded-2xl bg-brand-500/10 text-brand-400 mb-4 border border-brand-500/30">
-            <Lock className="w-8 h-8" />
+            <Lock className="w-7 h-7" />
           </div>
 
-          <h2 className="text-xl font-black text-white">Painel do Treinador</h2>
-          <p className="text-xs text-slate-400 mt-1 mb-5">
-            Acesso exclusivo ao Mini-CRM e gestão de renovação.
+          <span className="text-[10px] font-bold uppercase tracking-wider text-brand-400 block mb-1">
+            Plataforma Multi-Tenant
+          </span>
+          <h2 className="text-xl sm:text-2xl font-black text-white">Área do Treinador</h2>
+          <p className="text-xs text-slate-400 mt-1 mb-6">
+            Acesso administrativo ao Mini-CRM, agendamentos e biosite.
           </p>
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          {authError && (
+            <motion.div
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2 mb-4 text-left"
+            >
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+              <span>{authError}</span>
+            </motion.div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-4 text-left">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 text-left mb-1.5">
-                Digite o PIN de Acesso (Padrão: 1234)
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-brand-400" />
+                E-mail de Acesso
               </label>
               <input
-                type="password"
-                maxLength={8}
+                type="email"
+                required
                 autoFocus
-                placeholder="••••"
-                value={pinInput}
+                placeholder="seu.email@exemplo.com"
+                value={emailInput}
                 onChange={(e) => {
-                  setPinInput(e.target.value);
-                  setPinError(false);
+                  setEmailInput(e.target.value);
+                  setAuthError(null);
                 }}
-                className="w-full text-center text-xl tracking-widest px-4 py-3 rounded-xl glass-input font-mono"
+                className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white"
               />
-              {pinError && (
-                <p className="text-rose-400 text-xs mt-1.5 font-medium">
-                  PIN incorreto. Tente "1234" ou configure VITE_ADMIN_PIN.
-                </p>
-              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-brand-400" />
+                Senha
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  placeholder="••••••••"
+                  value={passwordInput}
+                  onChange={(e) => {
+                    setPasswordInput(e.target.value);
+                    setAuthError(null);
+                  }}
+                  className="w-full px-3.5 py-2.5 pr-10 rounded-xl glass-input text-xs text-white font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <button
               type="submit"
-              className="w-full min-h-[44px] py-3 px-4 rounded-xl bg-brand-500 hover:bg-brand-600 text-slate-950 font-black text-sm uppercase tracking-wider transition-all shadow-md shadow-brand-500/30 cursor-pointer"
+              disabled={isAuthenticating}
+              className="w-full min-h-[46px] py-3 px-4 rounded-xl bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-md shadow-brand-500/30 cursor-pointer flex items-center justify-center gap-2 mt-2"
             >
-              Acessar Painel
+              {isAuthenticating ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Autenticando...</span>
+                </>
+              ) : (
+                <>
+                  <span>Entrar no Painel</span>
+                  <Lock className="w-3.5 h-3.5 stroke-[2.5]" />
+                </>
+              )}
             </button>
           </form>
 
           <button
             onClick={onExit}
-            className="mt-4 min-h-[44px] text-xs text-slate-400 hover:text-white transition-colors flex items-center justify-center gap-1.5 w-full"
+            className="mt-5 min-h-[40px] text-xs text-slate-400 hover:text-white transition-colors flex items-center justify-center gap-1.5 w-full cursor-pointer"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Voltar ao Biosite</span>
+            <span>Voltar à Página Principal</span>
           </button>
         </motion.div>
       </div>
     );
   }
+
+  // Verificação de Validade da Assinatura do Personal (6 meses)
+  const expirationDate = activeProfile.data_expiracao ? new Date(activeProfile.data_expiracao + 'T23:59:59') : null;
+  const isSubscriptionExpired = expirationDate ? expirationDate.getTime() < Date.now() : false;
+  const daysUntilExpiration = expirationDate ? Math.ceil((expirationDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
+  const isExpiringSoon = daysUntilExpiration !== null && daysUntilExpiration >= 0 && daysUntilExpiration <= 15;
 
   return (
     <div className="min-h-screen bg-[#08090C] text-slate-100 p-3 sm:p-6 lg:p-8 selection:bg-brand-500 selection:text-white pb-20">
@@ -458,7 +594,7 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
           <button
             onClick={onExit}
             className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors"
-            title="Voltar ao Biosite"
+            title="Sair do painel"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -472,13 +608,27 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              Profissional: <strong className="text-slate-200">{profile.name}</strong> • {profile.cref}
+              Profissional: <strong className="text-slate-200">{activeProfile.name}</strong> • {activeProfile.cref}
+              {currentUserEmail && <span className="ml-1 text-slate-500">({currentUserEmail})</span>}
             </p>
           </div>
         </div>
 
         {/* Status Supabase & Ações Rápidas do Cabeçalho */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Link para visualização do Biosite Público do Personal */}
+          <a
+            href={`/?p=${activeProfile.slug || activeProfile.id || ''}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="min-h-[44px] flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 font-bold text-xs border border-white/10 transition-all cursor-pointer"
+            title="Abrir página pública do seu Biosite em nova aba"
+          >
+            <ExternalLink className="w-4 h-4 text-brand-400" />
+            <span className="hidden sm:inline">Ver Meu Biosite</span>
+            <span className="sm:hidden">Biosite</span>
+          </a>
+
           <div
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border ${
               supabaseActive
@@ -517,8 +667,62 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
             <Plus className="w-4 h-4 stroke-[3]" />
             <span>Novo Lead</span>
           </button>
+
+          {/* Botão de Logout */}
+          <button
+            onClick={handleLogout}
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-white/10 transition-colors cursor-pointer"
+            title="Encerrar Sessão (Logout)"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </header>
+
+      {/* AVISO DE CONTROLE DE VALIDADE DA ASSINATURA */}
+      {isSubscriptionExpired && (
+        <div className="max-w-7xl mx-auto my-4 p-4 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg shadow-rose-950/40">
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+            <div>
+              <strong className="text-white block font-bold text-sm">Sua Assinatura Biopersonal Pro Expirou!</strong>
+              <p className="text-rose-300 text-xs mt-0.5">
+                O ciclo de 6 meses venceu em {new Date(activeProfile.data_expiracao!).toLocaleDateString('pt-BR')}. Renove agora para manter seus agendamentos e biosite ativos.
+              </p>
+            </div>
+          </div>
+          <a
+            href={`https://wa.me/5511998765432?text=${encodeURIComponent(`Olá! Quero renovar minha assinatura do Biopersonal Pro para o perfil ${activeProfile.name}.`)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs whitespace-nowrap transition-colors shadow-md"
+          >
+            Falar com Suporte p/ Renovar
+          </a>
+        </div>
+      )}
+
+      {!isSubscriptionExpired && isExpiringSoon && (
+        <div className="max-w-7xl mx-auto my-4 p-4 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg shadow-amber-950/40">
+          <div className="flex items-center gap-2.5">
+            <Clock className="w-5 h-5 text-amber-400 shrink-0" />
+            <div>
+              <strong className="text-white block font-bold text-sm">Assinatura Próxima do Vencimento</strong>
+              <p className="text-amber-300 text-xs mt-0.5">
+                Restam apenas <strong>{daysUntilExpiration} dia{daysUntilExpiration === 1 ? '' : 's'}</strong> de vigência (vence em {new Date(activeProfile.data_expiracao!).toLocaleDateString('pt-BR')}). Renove com antecedência para garantir vaga sem interrupção.
+              </p>
+            </div>
+          </div>
+          <a
+            href={`https://wa.me/5511998765432?text=${encodeURIComponent(`Olá! Gostaria de antecipar a renovação da minha assinatura do Biopersonal Pro (${activeProfile.name}).`)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs whitespace-nowrap transition-colors shadow-md"
+          >
+            Renovar Agora
+          </a>
+        </div>
+      )}
 
       {/* 4. MINI METRO DE FATURAMENTO & CARDS DE ESTATÍSTICAS */}
       <section className="max-w-7xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-3 my-5">
@@ -1373,7 +1577,7 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
           setShowTemplatesModal(false);
           setSelectedLeadForTemplates(null);
         }}
-        profile={profile}
+        profile={activeProfile}
         selectedLead={selectedLeadForTemplates}
         onShowToast={onShowToast}
       />
@@ -1391,7 +1595,7 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
       <TrainerProfileEditModal
         isOpen={showProfileModal}
         onClose={() => setShowProfileModal(false)}
-        profile={profile}
+        profile={activeProfile}
         onSaveProfile={handleSaveProfile}
         onShowToast={onShowToast}
       />

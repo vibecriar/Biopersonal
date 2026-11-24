@@ -26,21 +26,14 @@ export const isSupabaseConfigured = (): boolean => {
   );
 };
 
-// Cliente Supabase com persistência desabilitada para anon e headers explícitos
-// evitando que sessões expiradas em localStorage sobreponham a chave pública com 401
+// Cliente Supabase com persistência de sessão e autenticação completa para multi-tenant SaaS
 export const supabase = isSupabaseConfigured()
   ? createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-        storageKey: 'biopersonal_anon_auth'
-      },
-      global: {
-        headers: {
-          apikey: supabaseAnonKey,
-          Authorization: `Bearer ${supabaseAnonKey}`
-        }
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storageKey: 'biopersonal_auth_session'
       }
     })
   : null;
@@ -420,6 +413,158 @@ export async function deleteLead(id: string): Promise<boolean> {
 const TRAINER_CACHE_KEY = 'biopersonal_trainer_profile_v1';
 
 /**
+ * Converte um registro do banco de dados (tabela trainers) para a interface ProfileConfig
+ */
+export function mapTrainerRowToProfile(data: any): ProfileConfig {
+  return {
+    id: data.id,
+    user_id: data.user_id || undefined,
+    slug: data.slug || undefined,
+    data_expiracao: data.data_expiracao || undefined,
+    active: data.active !== false,
+    name: data.name || profileConfig.name,
+    role: data.role || profileConfig.role,
+    tagline: data.tagline || data.bio || profileConfig.tagline,
+    cref: data.cref || profileConfig.cref,
+    avatarUrl: data.avatar_url || profileConfig.avatarUrl,
+    bgImageUrl: data.bg_image_url || profileConfig.bgImageUrl,
+    socialLinks: {
+      whatsapp: data.phone || profileConfig.socialLinks.whatsapp,
+      whatsappDefaultMessage: profileConfig.socialLinks.whatsappDefaultMessage,
+      instagram: data.instagram || profileConfig.socialLinks.instagram,
+      youtube: profileConfig.socialLinks.youtube,
+      strava: profileConfig.socialLinks.strava,
+    },
+    ctaButtons: profileConfig.ctaButtons,
+    services: Array.isArray(data.plans) && data.plans.length > 0 ? data.plans : profileConfig.services,
+    socialProof: (data.social_proof && typeof data.social_proof === 'object' && Object.keys(data.social_proof).length > 0)
+      ? data.social_proof
+      : profileConfig.socialProof,
+    vCardData: {
+      ...profileConfig.vCardData,
+      firstName: data.name?.split(' ')[0] || profileConfig.vCardData.firstName,
+      lastName: data.name?.split(' ').slice(1).join(' ') || profileConfig.vCardData.lastName,
+      phone: data.phone || profileConfig.socialLinks.whatsapp,
+      title: `Personal Trainer - ${data.cref || profileConfig.cref}`,
+    },
+    availableHours: (data.available_hours && typeof data.available_hours === 'object')
+      ? data.available_hours
+      : profileConfig.availableHours,
+  };
+}
+
+/**
+ * Busca os dados do treinador no Supabase por Slug (ex: /marcos-silva ou ?p=marcos-silva)
+ */
+export async function getTrainerBySlug(slug: string): Promise<ProfileConfig | null> {
+  const cleanSlug = slug.trim().toLowerCase().replace(/^\//, '');
+  if (!cleanSlug) return null;
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('trainers')
+        .select('*')
+        .eq('slug', cleanSlug)
+        .limit(1)
+        .maybeSingle();
+
+      if (!error && data) {
+        const mapped = mapTrainerRowToProfile(data);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('biopersonal_trainer_id', data.id);
+          localStorage.setItem(TRAINER_CACHE_KEY, JSON.stringify(mapped));
+        }
+        return mapped;
+      }
+    } catch (err) {
+      console.warn('Erro ao buscar trainer por slug:', err);
+    }
+  }
+
+  // Fallback se coincidir com o slug do profile padrão
+  if (profileConfig.slug === cleanSlug) {
+    return profileConfig;
+  }
+
+  return null;
+}
+
+/**
+ * Busca o registro de personal vinculado ao usuário autenticado (user_id do Supabase Auth)
+ */
+export async function getTrainerByUserId(userId: string): Promise<ProfileConfig | null> {
+  if (!supabase || !isValidUuid(userId)) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from('trainers')
+      .select('*')
+      .eq('user_id', userId)
+      .limit(1)
+      .maybeSingle();
+
+    if (!error && data) {
+      const mapped = mapTrainerRowToProfile(data);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('biopersonal_trainer_id', data.id);
+        localStorage.setItem(TRAINER_CACHE_KEY, JSON.stringify(mapped));
+      }
+      return mapped;
+    }
+  } catch (err) {
+    console.warn('Erro ao buscar trainer por user_id:', err);
+  }
+
+  return null;
+}
+
+/**
+ * Busca o usuário atualmente autenticado no Supabase Auth
+ */
+export async function getCurrentAuthUser() {
+  if (!supabase) return null;
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error || !session) return null;
+    return session.user;
+  } catch (err) {
+    return null;
+  }
+}
+
+/**
+ * Realiza login do personal usando E-mail e Senha no Supabase Auth
+ */
+export async function signInTrainer(email: string, password: string) {
+  if (!supabase) {
+    return { 
+      data: null, 
+      error: { message: 'Supabase não está configurado. Preencha as chaves no arquivo .env.' } 
+    };
+  }
+  return await supabase.auth.signInWithPassword({
+    email: email.trim(),
+    password
+  });
+}
+
+/**
+ * Desconecta o personal (Logout)
+ */
+export async function signOutTrainer() {
+  if (!supabase) return;
+  try {
+    await supabase.auth.signOut();
+  } catch (err) {
+    console.warn('Erro ao deslogar:', err);
+  }
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('biopersonal_trainer_id');
+  }
+}
+
+/**
  * Busca os dados do treinador (Tenant) no Supabase de forma dinâmica
  * Fallback para cache local e profileConfig padrão
  */
@@ -441,37 +586,7 @@ export async function getTrainer(trainerId?: string): Promise<ProfileConfig> {
       const { data, error } = await query.limit(1).maybeSingle();
 
       if (!error && data) {
-        const mappedProfile: ProfileConfig = {
-          id: data.id,
-          name: data.name || profileConfig.name,
-          role: data.role || profileConfig.role,
-          tagline: data.tagline || data.bio || profileConfig.tagline,
-          cref: data.cref || profileConfig.cref,
-          avatarUrl: data.avatar_url || profileConfig.avatarUrl,
-          bgImageUrl: data.bg_image_url || profileConfig.bgImageUrl,
-          socialLinks: {
-            whatsapp: data.phone || profileConfig.socialLinks.whatsapp,
-            whatsappDefaultMessage: profileConfig.socialLinks.whatsappDefaultMessage,
-            instagram: data.instagram || profileConfig.socialLinks.instagram,
-            youtube: profileConfig.socialLinks.youtube,
-            strava: profileConfig.socialLinks.strava,
-          },
-          ctaButtons: profileConfig.ctaButtons,
-          services: Array.isArray(data.plans) && data.plans.length > 0 ? data.plans : profileConfig.services,
-          socialProof: (data.social_proof && typeof data.social_proof === 'object' && Object.keys(data.social_proof).length > 0)
-            ? data.social_proof
-            : profileConfig.socialProof,
-          vCardData: {
-            ...profileConfig.vCardData,
-            firstName: data.name?.split(' ')[0] || profileConfig.vCardData.firstName,
-            lastName: data.name?.split(' ').slice(1).join(' ') || profileConfig.vCardData.lastName,
-            phone: data.phone || profileConfig.socialLinks.whatsapp,
-            title: `Personal Trainer - ${data.cref || profileConfig.cref}`,
-          },
-          availableHours: (data.available_hours && typeof data.available_hours === 'object')
-            ? data.available_hours
-            : profileConfig.availableHours,
-        };
+        const mappedProfile = mapTrainerRowToProfile(data);
 
         if (typeof window !== 'undefined') {
           localStorage.setItem('biopersonal_trainer_id', data.id);
@@ -519,6 +634,7 @@ export async function updateTrainer(
     payload.tagline = updates.tagline;
     payload.bio = updates.tagline;
   }
+  if (updates.slug !== undefined) payload.slug = updates.slug.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
   if (updates.avatarUrl !== undefined) payload.avatar_url = updates.avatarUrl;
   if (updates.bgImageUrl !== undefined) payload.bg_image_url = updates.bgImageUrl;
   if (updates.socialLinks?.whatsapp !== undefined) payload.phone = updates.socialLinks.whatsapp;
@@ -526,6 +642,8 @@ export async function updateTrainer(
   if (updates.services !== undefined) payload.plans = updates.services;
   if (updates.socialProof !== undefined) payload.social_proof = updates.socialProof;
   if (updates.availableHours !== undefined) payload.available_hours = updates.availableHours;
+  if (updates.data_expiracao !== undefined) payload.data_expiracao = updates.data_expiracao;
+  if (updates.active !== undefined) payload.active = updates.active;
 
   if (supabase) {
     try {
@@ -537,7 +655,10 @@ export async function updateTrainer(
         .single();
 
       if (!error && data) {
-        const updated = await getTrainer(trainerId);
+        const updated = mapTrainerRowToProfile(data);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(TRAINER_CACHE_KEY, JSON.stringify(updated));
+        }
         return { success: true, data: updated };
       }
       if (error) {

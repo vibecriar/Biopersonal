@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { 
-  Lock, 
-  MessageCircle
+  MessageCircle,
+  AlertTriangle,
+  ArrowLeft,
+  Dumbbell
 } from 'lucide-react';
 import { InstagramIcon } from './components/icons/InstagramIcon';
 import { HeaderHero } from './components/HeaderHero';
@@ -14,19 +16,33 @@ import { ServicesModal } from './components/ServicesModal';
 import { SocialProofModal } from './components/SocialProofModal';
 import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import { AdminCRM } from './components/AdminCRM';
+import { InstitutionalLanding } from './components/InstitutionalLanding';
 import { Toast } from './components/Toast';
 import { BiositeSkeleton } from './components/BiositeSkeleton';
 import { ProfileProvider, useProfile } from './context/ProfileContext';
 
 function AppContent() {
-  const { profile, isLoading, updateProfileData } = useProfile();
+  const { 
+    profile, 
+    setProfile, 
+    isLoading, 
+    slugNotFound, 
+    hasSlugInUrl, 
+    currentSlug, 
+    updateProfileData 
+  } = useProfile();
 
   const [isAdminView, setIsAdminView] = useState(() => {
-    // Permite acessar direto via URL: ?admin=true ou #admin ou /admin
+    // Permite acessar a rota geral do CRM via /admin, /login, #admin ou ?admin=true
+    const path = window.location.pathname.toLowerCase().replace(/\/+$/, '');
+    const hash = window.location.hash.toLowerCase();
+    const search = window.location.search;
     return (
-      window.location.hash === '#admin' ||
-      window.location.search.includes('admin=true') ||
-      window.location.pathname === '/admin'
+      hash === '#admin' ||
+      hash === '#login' ||
+      search.includes('admin=true') ||
+      path === '/admin' ||
+      path === '/login'
     );
   });
 
@@ -37,13 +53,26 @@ function AppContent() {
   const [selectedService, setSelectedService] = useState<string | undefined>();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Escuta mudanças de hash para navegação fácil
+  // Escuta mudanças de hash e popstate para navegação SPA suave
   useEffect(() => {
-    const handleHashChange = () => {
-      setIsAdminView(window.location.hash === '#admin');
+    const handleUrlChange = () => {
+      const path = window.location.pathname.toLowerCase().replace(/\/+$/, '');
+      const hash = window.location.hash.toLowerCase();
+      setIsAdminView(
+        hash === '#admin' ||
+        hash === '#login' ||
+        path === '/admin' ||
+        path === '/login' ||
+        window.location.search.includes('admin=true')
+      );
     };
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+
+    window.addEventListener('hashchange', handleUrlChange);
+    window.addEventListener('popstate', handleUrlChange);
+    return () => {
+      window.removeEventListener('hashchange', handleUrlChange);
+      window.removeEventListener('popstate', handleUrlChange);
+    };
   }, []);
 
   const showToast = (msg: string) => {
@@ -61,7 +90,7 @@ function AppContent() {
     return <BiositeSkeleton />;
   }
 
-  // Se o usuário estiver no painel administrativo
+  // 1. ROTA GERAL ADMINISTRATIVA DO CRM (/admin ou /login)
   if (isAdminView) {
     return (
       <AdminCRM
@@ -72,10 +101,62 @@ function AppContent() {
         }}
         onShowToast={showToast}
         onUpdateProfile={updateProfileData}
+        onSetContextProfile={setProfile}
       />
     );
   }
 
+  // 2. SE NENHUM SLUG FOI INFORMADO NA URL RAIZ: Exibe página institucional do SaaS
+  if (!hasSlugInUrl) {
+    return (
+      <InstitutionalLanding
+        onGoToLogin={() => {
+          setIsAdminView(true);
+          window.location.hash = '#admin';
+        }}
+        onViewDemo={() => {
+          window.location.search = '?p=rodrigo-thor';
+        }}
+      />
+    );
+  }
+
+  // 3. SE O SLUG INFORMADO NÃO FOR ENCONTRADO NO BANCO: Exibe tela amigável de 404
+  if (slugNotFound) {
+    return (
+      <div className="min-h-screen bg-[#08090C] text-slate-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-md glass-modal rounded-3xl p-8 text-center border border-white/15 shadow-2xl">
+          <div className="inline-flex p-3 rounded-2xl bg-amber-500/10 text-amber-400 mb-4 border border-amber-500/30">
+            <AlertTriangle className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl sm:text-2xl font-black text-white">Biosite Não Encontrado</h2>
+          <p className="text-xs text-slate-400 mt-2 mb-6 leading-relaxed">
+            O endereço <code className="text-brand-300 font-mono">/{currentSlug}</code> não corresponde a um personal trainer ativo no sistema.
+          </p>
+          <div className="space-y-2">
+            <a
+              href="/"
+              className="w-full min-h-[44px] py-3 px-4 rounded-xl bg-brand-500 hover:bg-brand-600 text-slate-950 font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Conhecer a Plataforma</span>
+            </a>
+            <button
+              onClick={() => {
+                setIsAdminView(true);
+                window.location.hash = '#admin';
+              }}
+              className="w-full min-h-[40px] text-xs text-slate-400 hover:text-white transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <span>Você é o treinador? Acesse o Painel</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 4. BIOSITE PÚBLICO DO PERSONAL (Carregado dinamicamente pelo slug)
   const bgImage = profile.bgImageUrl || 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1470&auto=format&fit=crop';
   const whatsappUrl = `https://wa.me/${(profile.socialLinks?.whatsapp || '').replace(/\D/g, '')}?text=${encodeURIComponent(profile.socialLinks?.whatsappDefaultMessage || 'Olá!')}`;
 
@@ -130,7 +211,7 @@ function AppContent() {
           />
         </div>
 
-        {/* Rodapé / Footer com Links Sociais Sutis e Termos LGPD */}
+        {/* Rodapé / Footer Limpo sem acesso ao CRM para o aluno/visitante */}
         <footer className="w-full max-w-md sm:max-w-xl md:max-w-2xl mx-auto px-4 mt-6 pt-6 border-t border-white/10 text-center">
           <div className="flex items-center justify-center gap-3 mb-2">
             {profile.socialLinks?.instagram && (
@@ -173,20 +254,6 @@ function AppContent() {
               className="text-[11px] text-slate-400 hover:text-brand-400 underline underline-offset-2 transition-colors cursor-pointer"
             >
               Política de Privacidade & Termos LGPD
-            </button>
-          </div>
-
-          {/* Botão de Acesso ao Mini-CRM Administrativo */}
-          <div className="mt-4">
-            <button
-              onClick={() => {
-                setIsAdminView(true);
-                window.location.hash = '#admin';
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-[10px] font-semibold text-slate-400 hover:text-brand-400 border border-white/10 transition-colors cursor-pointer"
-            >
-              <Lock className="w-3 h-3" />
-              <span>Painel do Personal (Mini-CRM)</span>
             </button>
           </div>
         </footer>

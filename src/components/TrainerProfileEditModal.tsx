@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, 
@@ -14,10 +14,15 @@ import {
   Loader2, 
   Sparkles,
   ShieldCheck,
-  CreditCard
+  CreditCard,
+  Upload,
+  Check,
+  Globe,
+  AlertCircle
 } from 'lucide-react';
 import { InstagramIcon } from './icons/InstagramIcon';
 import { ProfileConfig, ServicePlan } from '../types';
+import { compressImage, uploadTrainerImage } from '../lib/imageCompression';
 
 interface TrainerProfileEditModalProps {
   isOpen: boolean;
@@ -43,6 +48,7 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
   const [name, setName] = useState(profile.name);
   const [role, setRole] = useState(profile.role);
   const [cref, setCref] = useState(profile.cref);
+  const [slug, setSlug] = useState(profile.slug || '');
   const [tagline, setTagline] = useState(profile.tagline);
   const [whatsapp, setWhatsapp] = useState(profile.socialLinks.whatsapp);
   const [instagram, setInstagram] = useState(profile.socialLinks.instagram);
@@ -50,6 +56,95 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
   // Mídias
   const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl);
   const [bgImageUrl, setBgImageUrl] = useState(profile.bgImageUrl);
+
+  // Upload e Compressão de Imagens
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
+  const bgFileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarUploadProgress, setAvatarUploadProgress] = useState<string | null>(null);
+  const [avatarStats, setAvatarStats] = useState<string | null>(null);
+
+  const [isUploadingBg, setIsUploadingBg] = useState(false);
+  const [bgUploadProgress, setBgUploadProgress] = useState<string | null>(null);
+  const [bgStats, setBgStats] = useState<string | null>(null);
+
+  // Handler de upload com compressão da foto de perfil (máx 800px, WebP)
+  const handleAvatarFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingAvatar(true);
+    setAvatarUploadProgress('Comprimindo foto no dispositivo...');
+    setAvatarStats(null);
+
+    try {
+      const compressed = await compressImage(file, {
+        maxWidth: 800,
+        maxHeight: 800,
+        quality: 0.8,
+        format: 'image/webp'
+      });
+
+      setAvatarUploadProgress(`Enviando (${compressed.formattedCompressedSize})...`);
+
+      const trainerId = profile.id || 'default_trainer';
+      const res = await uploadTrainerImage(trainerId, compressed.blob, 'perfil');
+
+      if (res.success && res.publicUrl) {
+        setAvatarUrl(res.publicUrl);
+        setAvatarStats(`Otimizado: de ${compressed.formattedOriginalSize} para ${compressed.formattedCompressedSize} (${compressed.reductionPercentage}% menor)`);
+        onShowToast('Foto de perfil comprimida e atualizada!');
+      } else {
+        alert('Erro no upload: ' + (res.error || 'Verifique se o bucket biosite-images foi criado no Supabase.'));
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert('Erro ao comprimir imagem: ' + (err?.message || 'Tente novamente.'));
+    } finally {
+      setIsUploadingAvatar(false);
+      setAvatarUploadProgress(null);
+      if (avatarFileInputRef.current) avatarFileInputRef.current.value = '';
+    }
+  };
+
+  // Handler de upload com compressão da imagem de fundo (máx 1200px, WebP)
+  const handleBgFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingBg(true);
+    setBgUploadProgress('Comprimindo imagem de fundo...');
+    setBgStats(null);
+
+    try {
+      const compressed = await compressImage(file, {
+        maxWidth: 1200,
+        maxHeight: 1200,
+        quality: 0.8,
+        format: 'image/webp'
+      });
+
+      setBgUploadProgress(`Enviando (${compressed.formattedCompressedSize})...`);
+
+      const trainerId = profile.id || 'default_trainer';
+      const res = await uploadTrainerImage(trainerId, compressed.blob, 'fundo');
+
+      if (res.success && res.publicUrl) {
+        setBgImageUrl(res.publicUrl);
+        setBgStats(`Otimizado: de ${compressed.formattedOriginalSize} para ${compressed.formattedCompressedSize} (${compressed.reductionPercentage}% menor)`);
+        onShowToast('Imagem de fundo comprimida e atualizada!');
+      } else {
+        alert('Erro no upload: ' + (res.error || 'Verifique se o bucket biosite-images foi criado no Supabase.'));
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert('Erro ao comprimir imagem: ' + (err?.message || 'Tente novamente.'));
+    } finally {
+      setIsUploadingBg(false);
+      setBgUploadProgress(null);
+      if (bgFileInputRef.current) bgFileInputRef.current.value = '';
+    }
+  };
 
   // Planos (Serviços)
   const [services, setServices] = useState<ServicePlan[]>(() => {
@@ -138,6 +233,7 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
         name: name.trim(),
         role: role.trim(),
         cref: cref.trim(),
+        slug: slug.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-'),
         tagline: tagline.trim(),
         avatarUrl: avatarUrl.trim(),
         bgImageUrl: bgImageUrl.trim(),
@@ -321,6 +417,28 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
                     />
                   </div>
 
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                      <Globe className="w-3.5 h-3.5 text-brand-400" />
+                      Slug do seu Biosite (Link na Bio)
+                    </label>
+                    <div className="flex items-center">
+                      <span className="px-3 py-2.5 rounded-l-xl bg-white/5 border border-r-0 border-white/10 text-xs text-slate-400 font-mono">
+                        /?p=
+                      </span>
+                      <input
+                        type="text"
+                        value={slug}
+                        onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '-'))}
+                        placeholder="seu-nome-personal"
+                        className="w-full px-3.5 py-2.5 rounded-r-xl glass-input text-xs font-mono text-brand-300"
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Link público único que você usará na bio do Instagram e WhatsApp (ex: <code className="text-brand-300">/?p={slug || 'seu-nome'}</code>).
+                    </p>
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-white/10">
                     <div>
                       <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
@@ -354,61 +472,167 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
                 </div>
               )}
 
-              {/* ABA 2: MÍDIAS (FOTO DE PERFIL E FUNDO) */}
+              {/* ABA 2: MÍDIAS (FOTO DE PERFIL E FUNDO COM UPLOAD & COMPRESSÃO AUTOMÁTICA) */}
               {activeTab === 'midias' && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                      URL da Foto de Perfil (Avatar com anel pulsante)
-                    </label>
-                    <input
-                      type="url"
-                      required
-                      value={avatarUrl}
-                      onChange={(e) => setAvatarUrl(e.target.value)}
-                      placeholder="https://..."
-                      className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs"
-                    />
+                <div className="space-y-6">
+                  {/* Inputs de arquivo ocultos */}
+                  <input
+                    type="file"
+                    ref={avatarFileInputRef}
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarFileSelect}
+                  />
+                  <input
+                    type="file"
+                    ref={bgFileInputRef}
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleBgFileSelect}
+                  />
+
+                  {/* 1. SEÇÃO: FOTO DE PERFIL / AVATAR */}
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <label className="block text-xs font-bold text-white">
+                          Foto de Perfil (Avatar com anel pulsante)
+                        </label>
+                        <p className="text-[11px] text-slate-400">
+                          Redimensionamento automático (máx 800px) e conversão para WebP de alta performance.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => avatarFileInputRef.current?.click()}
+                        disabled={isUploadingAvatar}
+                        className="min-h-[40px] px-3.5 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-brand-500/20 transition-all cursor-pointer whitespace-nowrap"
+                      >
+                        {isUploadingAvatar ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>{avatarUploadProgress || 'Processando...'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4 stroke-[2.5]" />
+                            <span>Escolher da Galeria / Celular</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Feedback de estatísticas de compressão */}
+                    {avatarStats && (
+                      <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-[11px] text-emerald-300 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span>{avatarStats}</span>
+                      </div>
+                    )}
+
+                    {/* Campo de URL alternativa / fallback */}
+                    <div>
+                      <span className="block text-[10px] text-slate-400 font-medium mb-1">
+                        URL da Foto (preenchida automaticamente após o upload):
+                      </span>
+                      <input
+                        type="url"
+                        required
+                        value={avatarUrl}
+                        onChange={(e) => setAvatarUrl(e.target.value)}
+                        placeholder="https://..."
+                        className="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono text-slate-300"
+                      />
+                    </div>
+
+                    {/* Prévia da Foto */}
                     {avatarUrl && (
-                      <div className="mt-3 flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/10">
+                      <div className="flex items-center gap-3 p-3 rounded-xl bg-black/40 border border-white/10">
                         <img
                           src={avatarUrl}
                           alt="Prévia do Avatar"
-                          className="w-14 h-14 rounded-full object-cover border-2 border-brand-500 shadow-lg"
+                          className="w-16 h-16 rounded-full object-cover border-2 border-brand-500 shadow-lg shrink-0"
                           onError={(e) => {
                             (e.target as HTMLElement).style.display = 'none';
                           }}
                         />
                         <div className="text-xs">
                           <span className="font-bold text-white block">Prévia da Foto de Perfil</span>
-                          <span className="text-[11px] text-slate-400">Formato ideal: quadrado (proporção 1:1)</span>
+                          <span className="text-[11px] text-slate-400">
+                            Exibida com anel sonar pulsante e badge de especialista na tela inicial do Biosite.
+                          </span>
                         </div>
                       </div>
                     )}
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                      URL da Imagem de Fundo (Atmosphere Gym)
-                    </label>
-                    <input
-                      type="url"
-                      required
-                      value={bgImageUrl}
-                      onChange={(e) => setBgImageUrl(e.target.value)}
-                      placeholder="https://..."
-                      className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs"
-                    />
+                  {/* 2. SEÇÃO: IMAGEM DE FUNDO */}
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <label className="block text-xs font-bold text-white">
+                          Imagem de Fundo (Atmosphere Gym / Local de Treino)
+                        </label>
+                        <p className="text-[11px] text-slate-400">
+                          Redimensionamento automático (máx 1200px) e compressão para carregamento instantâneo.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => bgFileInputRef.current?.click()}
+                        disabled={isUploadingBg}
+                        className="min-h-[40px] px-3.5 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-brand-500/20 transition-all cursor-pointer whitespace-nowrap"
+                      >
+                        {isUploadingBg ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>{bgUploadProgress || 'Processando...'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4 stroke-[2.5]" />
+                            <span>Escolher da Galeria / Celular</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Feedback de estatísticas de compressão do fundo */}
+                    {bgStats && (
+                      <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-[11px] text-emerald-300 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span>{bgStats}</span>
+                      </div>
+                    )}
+
+                    {/* Campo de URL alternativa / fallback */}
+                    <div>
+                      <span className="block text-[10px] text-slate-400 font-medium mb-1">
+                        URL da Imagem de Fundo (preenchida automaticamente após o upload):
+                      </span>
+                      <input
+                        type="url"
+                        required
+                        value={bgImageUrl}
+                        onChange={(e) => setBgImageUrl(e.target.value)}
+                        placeholder="https://..."
+                        className="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono text-slate-300"
+                      />
+                    </div>
+
+                    {/* Prévia com Overlay Dark */}
                     {bgImageUrl && (
-                      <div className="mt-3 relative h-28 rounded-2xl overflow-hidden border border-white/10">
+                      <div className="relative h-28 rounded-xl overflow-hidden border border-white/10">
                         <img
                           src={bgImageUrl}
                           alt="Prévia do Fundo"
                           className="w-full h-full object-cover"
                         />
                         <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                          <span className="text-xs font-bold text-white bg-black/70 px-3 py-1.5 rounded-xl border border-white/20">
-                            Prévia com Overlay Dark
+                          <span className="text-xs font-bold text-white bg-black/80 px-3 py-1.5 rounded-xl border border-white/20">
+                            Prévia com Overlay Dark do Biosite
                           </span>
                         </div>
                       </div>

@@ -1,11 +1,13 @@
--- ==============================================================
--- BIOSITE WHITE-LABEL PARA PERSONAL TRAINERS - SCHEMA SUPABASE
--- ARQUITETURA MULTI-TENANT COM TABELA TRAINERS E TRAINER_ID
--- ==============================================================
+-- =========================================================================
+-- BIOPERSONAL PRO - SCHEMA SUPABASE PARA SAAS MULTI-TENANT DE PERSONAL TRAINERS
+-- Contempla: Auth (E-mail/Senha), Banco Multi-Tenant, Storage e RLS Estrito
+-- =========================================================================
 
 -- 1. Criação da tabela de Personais (Trainers / Tenants)
 CREATE TABLE IF NOT EXISTS public.trainers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    slug TEXT UNIQUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     name TEXT NOT NULL,
@@ -21,13 +23,14 @@ CREATE TABLE IF NOT EXISTS public.trainers (
     plans JSONB DEFAULT '[]'::jsonb,
     social_proof JSONB DEFAULT '{}'::jsonb,
     available_hours JSONB DEFAULT '{"Manhã": ["06:00","07:00","08:00","09:00","10:00","11:00"], "Tarde": ["14:00","15:00","16:00","17:00"], "Noite": ["18:00","19:00","20:00","21:00"]}'::jsonb,
+    data_expiracao DATE DEFAULT (CURRENT_DATE + INTERVAL '180 days'),
     active BOOLEAN DEFAULT true
 );
 
--- 2. Criação/Atualização da tabela de leads e agendamentos com chave estrangeira trainer_id
+-- 2. Criação da tabela de leads e agendamentos vinculada ao personal (trainer_id)
 CREATE TABLE IF NOT EXISTS public.leads_agendamentos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    trainer_id UUID REFERENCES public.trainers(id) ON DELETE CASCADE,
+    trainer_id UUID REFERENCES public.trainers(id) ON DELETE CASCADE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     nome TEXT NOT NULL,
@@ -54,9 +57,22 @@ CREATE TABLE IF NOT EXISTS public.leads_agendamentos (
     consentimento_lgpd BOOLEAN DEFAULT true
 );
 
--- Migrações incrementais seguras para colunas em trainers
+-- 3. Migrações incrementais seguras para colunas em trainers (Idempotente)
 DO $$
 BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'trainers' AND column_name = 'user_id') THEN
+        ALTER TABLE public.trainers ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'trainers' AND column_name = 'slug') THEN
+        ALTER TABLE public.trainers ADD COLUMN slug TEXT;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_trainers_slug_unique ON public.trainers (slug) WHERE slug IS NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'trainers' AND column_name = 'data_expiracao') THEN
+        ALTER TABLE public.trainers ADD COLUMN data_expiracao DATE DEFAULT (CURRENT_DATE + INTERVAL '180 days');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'trainers' AND column_name = 'active') THEN
+        ALTER TABLE public.trainers ADD COLUMN active BOOLEAN DEFAULT true;
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'trainers' AND column_name = 'role') THEN
         ALTER TABLE public.trainers ADD COLUMN role TEXT DEFAULT 'Personal Trainer & Consultoria de Alta Performance';
     END IF;
@@ -80,7 +96,7 @@ BEGIN
     END IF;
 END $$;
 
--- Migrações incrementais seguras para colunas em leads_agendamentos
+-- 4. Migrações incrementais seguras para colunas em leads_agendamentos (Idempotente)
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'leads_agendamentos' AND column_name = 'trainer_id') THEN
@@ -94,67 +110,137 @@ BEGIN
     END IF;
 END $$;
 
--- 3. Habilitação de Row Level Security (RLS)
+-- 5. Criação do Bucket de Imagens no Supabase Storage
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+    'biosite-images', 
+    'biosite-images', 
+    true, 
+    5242880, -- 5MB limite por arquivo
+    ARRAY['image/webp', 'image/jpeg', 'image/png', 'image/jpg']
+)
+ON CONFLICT (id) DO UPDATE 
+SET public = true, 
+    file_size_limit = 5242880, 
+    allowed_mime_types = ARRAY['image/webp', 'image/jpeg', 'image/png', 'image/jpg'];
+
+-- 6. Habilitação de Row Level Security (RLS)
 ALTER TABLE public.trainers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.leads_agendamentos ENABLE ROW LEVEL SECURITY;
 
--- 4. Concessão explícita de permissões do banco (DCL) para os papéis da API Supabase
+-- 7. Concessão de permissões de schema para anon e authenticated
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
 GRANT ALL ON TABLE public.trainers TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.leads_agendamentos TO anon, authenticated, service_role;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
 
--- 5. Políticas de Acesso RLS para anon e authenticated
+-- 8. POLÍTICAS RLS PARA A TABELA TRAINERS
+-- A. Leitura pública de personais ativos (para visitantes do biosite) ou do próprio personal autenticado
 DROP POLICY IF EXISTS "Permitir leitura pública de trainers" ON public.trainers;
-CREATE POLICY "Permitir leitura pública de trainers" 
+DROP POLICY IF EXISTS "Permitir leitura pública de trainers ativos" ON public.trainers;
+CREATE POLICY "Permitir leitura pública de trainers ativos" 
 ON public.trainers 
 FOR SELECT 
 TO anon, authenticated 
-USING (true);
+USING (active = true OR auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Permitir inserção de trainers" ON public.trainers;
-CREATE POLICY "Permitir inserção de trainers" 
-ON public.trainers 
-FOR INSERT 
-TO anon, authenticated 
-WITH CHECK (true);
-
+-- B. Personal autenticado pode atualizar apenas o seu próprio registro
 DROP POLICY IF EXISTS "Permitir atualização de trainers" ON public.trainers;
-CREATE POLICY "Permitir atualização de trainers" 
+DROP POLICY IF EXISTS "Personal edita apenas seu perfil" ON public.trainers;
+CREATE POLICY "Personal edita apenas seu perfil" 
 ON public.trainers 
 FOR UPDATE 
-TO anon, authenticated 
-USING (true);
+TO authenticated 
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
 
+-- C. Personal autenticado pode cadastrar seu próprio registro caso ainda não exista
+DROP POLICY IF EXISTS "Permitir inserção de trainers" ON public.trainers;
+DROP POLICY IF EXISTS "Personal cria seu proprio perfil" ON public.trainers;
+CREATE POLICY "Personal cria seu proprio perfil" 
+ON public.trainers 
+FOR INSERT 
+TO authenticated 
+WITH CHECK (auth.uid() = user_id);
+
+-- 9. POLÍTICAS RLS PARA A TABELA LEADS_AGENDAMENTOS
+-- A. Visitantes anônimos podem inserir novos leads vinculados ao personal
 DROP POLICY IF EXISTS "Permitir inserção pública de novos leads" ON public.leads_agendamentos;
 CREATE POLICY "Permitir inserção pública de novos leads" 
 ON public.leads_agendamentos 
 FOR INSERT 
 TO anon, authenticated 
-WITH CHECK (true);
+WITH CHECK (trainer_id IS NOT NULL);
 
+-- B. Personal autenticado pode visualizar apenas seus próprios leads
 DROP POLICY IF EXISTS "Permitir leitura de leads" ON public.leads_agendamentos;
-CREATE POLICY "Permitir leitura de leads" 
+DROP POLICY IF EXISTS "Personal visualiza apenas seus leads" ON public.leads_agendamentos;
+CREATE POLICY "Personal visualiza apenas seus leads" 
 ON public.leads_agendamentos 
 FOR SELECT 
-TO anon, authenticated 
-USING (true);
+TO authenticated 
+USING (
+    trainer_id IN (SELECT id FROM public.trainers WHERE user_id = auth.uid())
+);
 
+-- C. Personal autenticado pode atualizar apenas seus próprios leads
 DROP POLICY IF EXISTS "Permitir atualização de leads" ON public.leads_agendamentos;
-CREATE POLICY "Permitir atualização de leads" 
+DROP POLICY IF EXISTS "Personal atualiza apenas seus leads" ON public.leads_agendamentos;
+CREATE POLICY "Personal atualiza apenas seus leads" 
 ON public.leads_agendamentos 
 FOR UPDATE 
-TO anon, authenticated 
-USING (true);
+TO authenticated 
+USING (
+    trainer_id IN (SELECT id FROM public.trainers WHERE user_id = auth.uid())
+)
+WITH CHECK (
+    trainer_id IN (SELECT id FROM public.trainers WHERE user_id = auth.uid())
+);
 
+-- D. Personal autenticado pode excluir apenas seus próprios leads
 DROP POLICY IF EXISTS "Permitir exclusão de leads" ON public.leads_agendamentos;
-CREATE POLICY "Permitir exclusão de leads" 
+DROP POLICY IF EXISTS "Personal exclui apenas seus leads" ON public.leads_agendamentos;
+CREATE POLICY "Personal exclui apenas seus leads" 
 ON public.leads_agendamentos 
 FOR DELETE 
-TO anon, authenticated 
-USING (true);
+TO authenticated 
+USING (
+    trainer_id IN (SELECT id FROM public.trainers WHERE user_id = auth.uid())
+);
 
--- 5. Índices para performance e consultas multi-tenant
+-- 10. POLÍTICAS RLS PARA O STORAGE (BUCKET biosite-images)
+-- A. Leitura pública de qualquer imagem do bucket
+DROP POLICY IF EXISTS "Leitura pública biosite-images" ON storage.objects;
+CREATE POLICY "Leitura pública biosite-images"
+ON storage.objects FOR SELECT
+TO anon, authenticated
+USING (bucket_id = 'biosite-images');
+
+-- B. Upload permitido para usuários autenticados
+DROP POLICY IF EXISTS "Upload autenticado biosite-images" ON storage.objects;
+CREATE POLICY "Upload autenticado biosite-images"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (bucket_id = 'biosite-images');
+
+-- C. Atualização permitida para usuários autenticados
+DROP POLICY IF EXISTS "Atualização autenticada biosite-images" ON storage.objects;
+CREATE POLICY "Atualização autenticada biosite-images"
+ON storage.objects FOR UPDATE
+TO authenticated
+USING (bucket_id = 'biosite-images');
+
+-- D. Exclusão de imagens permitida para usuários autenticados
+DROP POLICY IF EXISTS "Exclusão autenticada biosite-images" ON storage.objects;
+CREATE POLICY "Exclusão autenticada biosite-images"
+ON storage.objects FOR DELETE
+TO authenticated
+USING (bucket_id = 'biosite-images');
+
+-- 11. Índices para performance e consultas multi-tenant de alta escala
+CREATE INDEX IF NOT EXISTS idx_trainers_user_id ON public.trainers (user_id);
+CREATE INDEX IF NOT EXISTS idx_trainers_slug ON public.trainers (slug);
+CREATE INDEX IF NOT EXISTS idx_trainers_active ON public.trainers (active);
 CREATE INDEX IF NOT EXISTS idx_leads_trainer_id ON public.leads_agendamentos (trainer_id);
 CREATE INDEX IF NOT EXISTS idx_leads_created_at ON public.leads_agendamentos (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_leads_status ON public.leads_agendamentos (status);

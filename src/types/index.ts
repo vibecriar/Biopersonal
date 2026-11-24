@@ -65,6 +65,10 @@ export interface VCardData {
 
 export interface ProfileConfig {
   id?: string; // ID ou UUID do Personal (Tenant) no Supabase
+  user_id?: string; // UUID do usuário no Supabase Auth (auth.users)
+  slug?: string; // Slug único para URL pública (ex: /marcos-personal)
+  data_expiracao?: string; // Data de vencimento da assinatura de 6 meses (YYYY-MM-DD)
+  active?: boolean; // Status de ativação da assinatura no SaaS
   name: string;
   role: string;
   tagline: string;
