@@ -122,7 +122,7 @@ export async function compressImage(
 }
 
 /**
- * Envia imagem comprimida para o Supabase Storage no bucket biosite-images
+ * Envia imagem comprimida para o Supabase Storage no bucket avatars
  * Utiliza upsert: true para sobrescrever o arquivo do personal e não acumular lixo
  */
 export async function uploadTrainerImage(
@@ -143,9 +143,9 @@ export async function uploadTrainerImage(
     const cleanTrainerId = trainerId.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
     const filePath = `${cleanTrainerId}/${finalName}`;
 
-    // Upload para o bucket público biosite-images com upsert: true
+    // Upload para o bucket público avatars com upsert: true
     const { error: uploadError } = await supabase.storage
-      .from('biosite-images')
+      .from('avatars')
       .upload(filePath, fileBlob, {
         contentType: 'image/webp',
         upsert: true,
@@ -157,9 +157,9 @@ export async function uploadTrainerImage(
       return { success: false, error: uploadError.message };
     }
 
-    // Obtém a URL pública do bucket
+    // Obtém a URL pública do bucket avatars
     const { data: urlData } = supabase.storage
-      .from('biosite-images')
+      .from('avatars')
       .getPublicUrl(filePath);
 
     // Timestamp cache-busting para forçar atualização visual instantânea no browser

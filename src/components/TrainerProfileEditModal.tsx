@@ -103,7 +103,7 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
         setAvatarStats(`Otimizado: de ${compressed.formattedOriginalSize} para ${compressed.formattedCompressedSize} (${compressed.reductionPercentage}% menor)`);
         onShowToast('Foto de perfil comprimida e atualizada!');
       } else {
-        alert('Erro no upload: ' + (res.error || 'Verifique se o bucket biosite-images foi criado no Supabase.'));
+        alert('Erro no upload: ' + (res.error || 'Verifique se o bucket avatars foi criado no Supabase.'));
       }
     } catch (err: any) {
       console.error(err);
@@ -142,7 +142,7 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
         setBgStats(`Otimizado: de ${compressed.formattedOriginalSize} para ${compressed.formattedCompressedSize} (${compressed.reductionPercentage}% menor)`);
         onShowToast('Imagem de fundo comprimida e atualizada!');
       } else {
-        alert('Erro no upload: ' + (res.error || 'Verifique se o bucket biosite-images foi criado no Supabase.'));
+        alert('Erro no upload: ' + (res.error || 'Verifique se o bucket avatars foi criado no Supabase.'));
       }
     } catch (err: any) {
       console.error(err);
@@ -558,8 +558,8 @@ export const TrainerProfileEditModal: React.FC<TrainerProfileEditModalProps> = (
                               setCorTexto(p.cor_texto);
                             }}
                             className={`p-3.5 rounded-2xl text-left border transition-all cursor-pointer relative flex flex-col justify-between ${isSelected
-                                ? 'border-brand-500 bg-brand-500/10 ring-2 ring-brand-500/30 shadow-lg'
-                                : 'border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10'
+                              ? 'border-brand-500 bg-brand-500/10 ring-2 ring-brand-500/30 shadow-lg'
+                              : 'border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10'
                               }`}
                           >
                             <div className="flex items-center justify-between gap-2 mb-2">

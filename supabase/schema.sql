@@ -130,11 +130,11 @@ BEGIN
     END IF;
 END $$;
 
--- 5. Criação do Bucket de Imagens no Supabase Storage
+-- 5. Criação do Bucket de Imagens no Supabase Storage ('avatars')
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
-    'biosite-images', 
-    'biosite-images', 
+    'avatars', 
+    'avatars', 
     true, 
     5242880, -- 5MB limite por arquivo
     ARRAY['image/webp', 'image/jpeg', 'image/png', 'image/jpg']
@@ -228,34 +228,38 @@ USING (
     trainer_id IN (SELECT id FROM public.trainers WHERE user_id = auth.uid())
 );
 
--- 10. POLÍTICAS RLS PARA O STORAGE (BUCKET biosite-images)
+-- 10. POLÍTICAS RLS PARA O STORAGE (BUCKET avatars / biosite-images)
 -- A. Leitura pública de qualquer imagem do bucket
+DROP POLICY IF EXISTS "Leitura pública storage avatars" ON storage.objects;
 DROP POLICY IF EXISTS "Leitura pública biosite-images" ON storage.objects;
-CREATE POLICY "Leitura pública biosite-images"
+CREATE POLICY "Leitura pública storage avatars"
 ON storage.objects FOR SELECT
 TO anon, authenticated
-USING (bucket_id = 'biosite-images');
+USING (bucket_id IN ('avatars', 'biosite-images'));
 
 -- B. Upload permitido para usuários autenticados
+DROP POLICY IF EXISTS "Upload autenticado storage avatars" ON storage.objects;
 DROP POLICY IF EXISTS "Upload autenticado biosite-images" ON storage.objects;
-CREATE POLICY "Upload autenticado biosite-images"
+CREATE POLICY "Upload autenticado storage avatars"
 ON storage.objects FOR INSERT
 TO authenticated
-WITH CHECK (bucket_id = 'biosite-images');
+WITH CHECK (bucket_id IN ('avatars', 'biosite-images'));
 
 -- C. Atualização permitida para usuários autenticados
+DROP POLICY IF EXISTS "Atualização autenticada storage avatars" ON storage.objects;
 DROP POLICY IF EXISTS "Atualização autenticada biosite-images" ON storage.objects;
-CREATE POLICY "Atualização autenticada biosite-images"
+CREATE POLICY "Atualização autenticada storage avatars"
 ON storage.objects FOR UPDATE
 TO authenticated
-USING (bucket_id = 'biosite-images');
+USING (bucket_id IN ('avatars', 'biosite-images'));
 
 -- D. Exclusão de imagens permitida para usuários autenticados
+DROP POLICY IF EXISTS "Exclusão autenticada storage avatars" ON storage.objects;
 DROP POLICY IF EXISTS "Exclusão autenticada biosite-images" ON storage.objects;
-CREATE POLICY "Exclusão autenticada biosite-images"
+CREATE POLICY "Exclusão autenticada storage avatars"
 ON storage.objects FOR DELETE
 TO authenticated
-USING (bucket_id = 'biosite-images');
+USING (bucket_id IN ('avatars', 'biosite-images'));
 
 -- 11. Índices para performance e consultas multi-tenant de alta escala
 CREATE INDEX IF NOT EXISTS idx_trainers_user_id ON public.trainers (user_id);
