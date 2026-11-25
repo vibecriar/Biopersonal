@@ -104,7 +104,7 @@ export interface ProfileConfig {
   availableHours?: Record<'Manhã' | 'Tarde' | 'Noite', string[]>;
 }
 
-export type LeadStatus = 'Novo Lead' | 'Contato Feito' | 'Avaliação Agendada' | 'Convertido';
+export type LeadStatus = 'Novo Lead' | 'Contato Feito' | 'Avaliação Agendada' | 'Convertido' | 'Cancelado';
 export type PlanDuration = 'Mensal' | 'Trimestral' | 'Semestral';
 export type PaymentMethod = 'Pix' | 'Cartão / Recorrência' | 'Boleto' | 'Dinheiro';
 
@@ -121,7 +121,7 @@ export interface LeadAgendamento {
   observacoes?: string;
   status: LeadStatus;
   plano_interesse?: string;
-  
+
   // Campos de Gestão de Alunos Ativos & Renovação
   plano_tipo?: PlanDuration;
   plano_valor?: number;

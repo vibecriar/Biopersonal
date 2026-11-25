@@ -1,20 +1,20 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Users, 
-  MessageCircle, 
-  Trash2, 
-  RefreshCw, 
-  Plus, 
-  Search, 
+import {
+  Users,
+  MessageCircle,
+  Trash2,
+  RefreshCw,
+  Plus,
+  Search,
   CheckCircle,
-  CheckCircle2, 
-  Clock, 
-  Calendar, 
+  CheckCircle2,
+  Clock,
+  Calendar,
   CalendarDays,
-  Lock, 
-  ArrowLeft, 
-  Database, 
+  Lock,
+  ArrowLeft,
+  Database,
   LayoutGrid,
   List,
   Sparkles,
@@ -45,12 +45,12 @@ import {
 } from 'lucide-react';
 import { LeadAgendamento, LeadStatus, ProfileConfig, PaymentMethod } from '../types';
 import { emptyProfile } from '../config/profile';
-import { 
-  getLeads, 
-  updateLeadStatus, 
-  updateLeadDetails, 
-  deleteLead, 
-  createAgendamento, 
+import {
+  getLeads,
+  updateLeadStatus,
+  updateLeadDetails,
+  deleteLead,
+  createAgendamento,
   isSupabaseConfigured,
   signInTrainer,
   signOutTrainer,
@@ -76,7 +76,8 @@ const STATUS_COLUMNS: Array<{ id: LeadStatus; label: string; shortLabel: string;
   { id: 'Novo Lead', label: 'Novos Leads', shortLabel: 'Novos', color: 'border-sky-500/40 bg-sky-500/10 text-sky-400', badge: 'bg-sky-500/20 text-sky-300' },
   { id: 'Contato Feito', label: 'Contato Feito', shortLabel: 'Contato', color: 'border-amber-500/40 bg-amber-500/10 text-amber-400', badge: 'bg-amber-500/20 text-amber-300' },
   { id: 'Avaliação Agendada', label: 'Avaliação Agendada', shortLabel: 'Agendados', color: 'border-purple-500/40 bg-purple-500/10 text-purple-400', badge: 'bg-purple-500/20 text-purple-300' },
-  { id: 'Convertido', label: 'Alunos / Convertidos', shortLabel: 'Alunos', color: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400', badge: 'bg-emerald-500/20 text-emerald-300' }
+  { id: 'Convertido', label: 'Alunos / Convertidos', shortLabel: 'Alunos', color: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400', badge: 'bg-emerald-500/20 text-emerald-300' },
+  { id: 'Cancelado', label: 'Cancelados / Desistência', shortLabel: 'Cancelados', color: 'border-rose-500/40 bg-rose-500/10 text-rose-400', badge: 'bg-rose-500/20 text-rose-300' }
 ];
 
 export const AdminCRM: React.FC<AdminCRMProps> = ({
@@ -123,7 +124,7 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
   const [leads, setLeads] = useState<LeadAgendamento[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [viewMode, setViewMode] = useState<'kanban' | 'table' | 'agenda'>('kanban');
-  
+
   // Filtros Rápidos
   const [searchQuery, setSearchQuery] = useState('');
   const [filterGoal, setFilterGoal] = useState<string>('all');
@@ -263,7 +264,7 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
     if (isAuthenticated) {
       loadLeads();
     }
-  }, [isAuthenticated, profile.id]);
+  }, [isAuthenticated, activeProfile.id, profile.id]);
 
   const handleStatusChange = async (id: string, newStatus: LeadStatus) => {
     await updateLeadStatus(id, newStatus);
@@ -288,7 +289,7 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
     if (!newNome || !newWhatsapp) return;
 
     await createAgendamento({
-      trainer_id: profile.id || undefined,
+      trainer_id: activeProfile.id || profile.id || undefined,
       nome: newNome,
       whatsapp: newWhatsapp.replace(/\D/g, ''),
       objetivo: newObjetivo,
@@ -475,7 +476,7 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
   const countExpiringThisWeek = useMemo(() => {
     return leads.filter(isExpiringThisWeek).length;
   }, [leads]);
-  
+
   // Total faturado no mês (soma dos valores dos alunos convertidos ativos)
   const currentBilled = useMemo(() => {
     return leads
@@ -685,11 +686,10 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
           </a>
 
           <div
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border ${
-              supabaseActive
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border ${supabaseActive
                 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                 : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-            }`}
+              }`}
           >
             <Database className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">{supabaseActive ? 'Supabase Conectado' : 'Modo Standalone (Local)'}</span>
@@ -919,11 +919,10 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
         {/* Card 3: Alunos Ativos & Renovações (Interativo para Filtro Rápido) */}
         <div
           onClick={() => setFilterExpiringThisWeek(prev => !prev)}
-          className={`p-4 rounded-2xl glass-card border transition-all flex flex-col justify-between cursor-pointer select-none group relative overflow-hidden ${
-            filterExpiringThisWeek
+          className={`p-4 rounded-2xl glass-card border transition-all flex flex-col justify-between cursor-pointer select-none group relative overflow-hidden ${filterExpiringThisWeek
               ? 'border-amber-500 bg-amber-500/10 ring-2 ring-amber-500/40 shadow-[0_0_25px_rgba(245,158,11,0.2)]'
               : 'border-white/10 hover:border-amber-500/40 hover:bg-white/[0.06]'
-          }`}
+            }`}
           title={filterExpiringThisWeek ? "Filtro ativo: Clique para limpar" : "Clique para filtrar alunos a vencer nos próximos 7 dias"}
         >
           <div className="text-xs font-semibold text-emerald-400 flex items-center justify-between">
@@ -985,11 +984,10 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
             {/* Toggle de Alertas Urgentes */}
             <button
               onClick={() => setFilterOnlyUrgent(!filterOnlyUrgent)}
-              className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border ${
-                filterOnlyUrgent
+              className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border ${filterOnlyUrgent
                   ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-md shadow-rose-950'
                   : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
-              }`}
+                }`}
             >
               <AlertTriangle className={`w-3.5 h-3.5 ${filterOnlyUrgent ? 'text-rose-400' : 'text-amber-400'}`} />
               <span>Apenas Urgentes / Alertas</span>
@@ -998,11 +996,10 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
             {/* Toggle Rápido: Vencendo Nesta Semana */}
             <button
               onClick={() => setFilterExpiringThisWeek(!filterExpiringThisWeek)}
-              className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border ${
-                filterExpiringThisWeek
+              className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border ${filterExpiringThisWeek
                   ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-md shadow-amber-950'
                   : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
-              }`}
+                }`}
               title="Filtrar alunos com vencimento nos próximos 7 dias"
             >
               <Clock className={`w-3.5 h-3.5 ${filterExpiringThisWeek ? 'text-amber-400' : 'text-slate-400'}`} />
@@ -1076,9 +1073,8 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
             <div className="flex items-center gap-1 p-1 rounded-xl bg-white/5 border border-white/10">
               <button
                 onClick={() => setViewMode('kanban')}
-                className={`min-h-[38px] px-2.5 sm:px-3 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-bold ${
-                  viewMode === 'kanban' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-                }`}
+                className={`min-h-[38px] px-2.5 sm:px-3 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-bold ${viewMode === 'kanban' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+                  }`}
                 title="Modo Kanban"
               >
                 <LayoutGrid className="w-4 h-4" />
@@ -1086,9 +1082,8 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
               </button>
               <button
                 onClick={() => setViewMode('table')}
-                className={`min-h-[38px] px-2.5 sm:px-3 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-bold ${
-                  viewMode === 'table' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-                }`}
+                className={`min-h-[38px] px-2.5 sm:px-3 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-bold ${viewMode === 'table' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+                  }`}
                 title="Modo Tabela"
               >
                 <List className="w-4 h-4" />
@@ -1096,9 +1091,8 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
               </button>
               <button
                 onClick={() => setViewMode('agenda')}
-                className={`min-h-[38px] px-2.5 sm:px-3 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-bold ${
-                  viewMode === 'agenda' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-                }`}
+                className={`min-h-[38px] px-2.5 sm:px-3 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-bold ${viewMode === 'agenda' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+                  }`}
                 title="Agenda de Atendimentos"
               >
                 <CalendarDays className="w-4 h-4" />
@@ -1139,11 +1133,10 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
                 <button
                   key={col.id}
                   onClick={() => handleMobileTabClick(col.id)}
-                  className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
-                    isSelected
+                  className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${isSelected
                       ? 'bg-brand-500 text-slate-950 shadow-md'
                       : 'text-slate-400 hover:text-white hover:bg-white/5'
-                  }`}
+                    }`}
                 >
                   <span>{col.shortLabel}</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isSelected ? 'bg-slate-950 text-white' : 'bg-white/10 text-slate-300'}`}>
@@ -1208,11 +1201,10 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
                       await handleStatusChange(droppedId, col.id);
                     }
                   }}
-                  className={`w-[88vw] sm:w-[340px] md:w-auto shrink-0 md:shrink rounded-2xl glass-card p-3 sm:p-4 border transition-all flex flex-col min-h-[500px] snap-center ${
-                    isOver
+                  className={`w-[88vw] sm:w-[340px] md:w-auto shrink-0 md:shrink rounded-2xl glass-card p-3 sm:p-4 border transition-all flex flex-col min-h-[500px] snap-center ${isOver
                       ? 'border-brand-500 bg-brand-500/10 ring-2 ring-brand-500/40 shadow-[0_0_25px_rgba(255,122,0,0.2)] scale-[1.01]'
                       : 'border-white/10'
-                  }`}
+                    }`}
                 >
                   {/* Cabeçalho da Coluna */}
                   <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
@@ -1250,15 +1242,13 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
                               setDraggedLeadId(null);
                               setDragOverColumn(null);
                             }}
-                            className={`p-3.5 rounded-2xl bg-white/5 border transition-all shadow-md group relative cursor-grab active:cursor-grabbing ${
-                              isDragging ? 'opacity-40 scale-95 border-brand-500' : ''
-                            } ${
-                              forgottenAlert
+                            className={`p-3.5 rounded-2xl bg-white/5 border transition-all shadow-md group relative cursor-grab active:cursor-grabbing ${isDragging ? 'opacity-40 scale-95 border-brand-500' : ''
+                              } ${forgottenAlert
                                 ? 'border-rose-500/40 hover:border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.15)]'
                                 : renewalAlert && renewalAlert.isNearExpiration
-                                ? 'border-amber-500/40 hover:border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.15)]'
-                                : 'border-white/10 hover:border-brand-500/40'
-                            }`}
+                                  ? 'border-amber-500/40 hover:border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.15)]'
+                                  : 'border-white/10 hover:border-brand-500/40'
+                              }`}
                           >
                             {/* Badges de Alerta no Topo do Card */}
                             {forgottenAlert && (
@@ -1269,13 +1259,12 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
 
                             {renewalAlert && (
                               <div
-                                className={`mb-2 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                                  renewalAlert.isExpired
+                                className={`mb-2 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${renewalAlert.isExpired
                                     ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse'
                                     : renewalAlert.isNearExpiration
-                                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                                    : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                                }`}
+                                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                      : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                                  }`}
                               >
                                 <span>{renewalAlert.label}</span>
                               </div>
@@ -1327,7 +1316,7 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
                                 </span>
                               )}
                               {lead.status === 'Convertido' && (
-                                <span 
+                                <span
                                   className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-300/90 border border-amber-500/25 flex items-center gap-1"
                                   title={`Forma de Pagamento: ${lead.payment_method || 'Pix'}`}
                                 >
@@ -1387,11 +1376,10 @@ export const AdminCRM: React.FC<AdminCRMProps> = ({
                                 href={buildSmartWhatsAppLink(lead)}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className={`w-full min-h-[44px] px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                                  lead.status === 'Convertido' && renewalAlert && renewalAlert.isNearExpiration
+                                className={`w-full min-h-[44px] px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${lead.status === 'Convertido' && renewalAlert && renewalAlert.isNearExpiration
                                     ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-md shadow-amber-500/25'
                                     : 'bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-slate-950 border border-emerald-500/40'
-                                }`}
+                                  }`}
                               >
                                 <MessageCircle className="w-4 h-4" />
                                 <span>

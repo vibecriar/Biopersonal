@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS public.leads_agendamentos (
     turno_preferencia TEXT NOT NULL CHECK (turno_preferencia IN ('Manhã', 'Tarde', 'Noite')),
     observacoes TEXT DEFAULT '',
     plano_interesse TEXT DEFAULT 'Geral',
-    status TEXT NOT NULL DEFAULT 'Novo Lead' CHECK (status IN ('Novo Lead', 'Contato Feito', 'Avaliação Agendada', 'Convertido')),
+    status TEXT NOT NULL DEFAULT 'Novo Lead' CHECK (status IN ('Novo Lead', 'Contato Feito', 'Avaliação Agendada', 'Convertido', 'Cancelado')),
     
     -- Gestão de Alunos Ativos & Renovação
     plano_tipo TEXT DEFAULT 'Mensal' CHECK (plano_tipo IN ('Mensal', 'Trimestral', 'Semestral')),
@@ -269,3 +269,42 @@ CREATE INDEX IF NOT EXISTS idx_leads_trainer_id ON public.leads_agendamentos (tr
 CREATE INDEX IF NOT EXISTS idx_leads_created_at ON public.leads_agendamentos (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_leads_status ON public.leads_agendamentos (status);
 CREATE INDEX IF NOT EXISTS idx_leads_vencimento ON public.leads_agendamentos (data_vencimento);
+CREATE INDEX IF NOT EXISTS idx_leads_trainer_date ON public.leads_agendamentos (trainer_id, data_preferencia);
+
+-- 12. Atualização idempotente da constraint de status em bases existentes
+DO $$
+BEGIN
+    ALTER TABLE public.leads_agendamentos DROP CONSTRAINT IF EXISTS leads_agendamentos_status_check;
+    ALTER TABLE public.leads_agendamentos ADD CONSTRAINT leads_agendamentos_status_check 
+        CHECK (status IN ('Novo Lead', 'Contato Feito', 'Avaliação Agendada', 'Convertido', 'Cancelado'));
+EXCEPTION
+    WHEN OTHERS THEN
+        NULL;
+END $$;
+
+-- 13. Função RPC com SECURITY DEFINER para consulta pública de horários ocupados
+-- Permite que a página pública do Biosite (/p/:slug) consulte horários indisponíveis
+-- sem expor dados pessoais (nome, whatsapp, objetivo) dos leads/alunos.
+CREATE OR REPLACE FUNCTION public.get_horarios_ocupados(
+    p_trainer_id UUID,
+    p_data DATE
+)
+RETURNS TABLE (horario TEXT)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT DISTINCT l.horario
+    FROM public.leads_agendamentos l
+    WHERE l.trainer_id = p_trainer_id
+      AND l.data_preferencia = p_data
+      AND l.status != 'Cancelado'
+      AND l.horario IS NOT NULL
+      AND TRIM(l.horario) != '';
+END;
+$$;
+
+-- Permissões de execução para anônimo (visitantes do biosite), autenticado e service_role
+GRANT EXECUTE ON FUNCTION public.get_horarios_ocupados(UUID, DATE) TO anon, authenticated, service_role;

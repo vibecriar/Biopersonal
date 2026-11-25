@@ -95,6 +95,53 @@ export async function createAgendamento(
 }
 
 /**
+ * Consulta os horários já ocupados de um personal em uma data específica.
+ * Utiliza a função RPC get_horarios_ocupados (com SECURITY DEFINER para permitir
+ * consulta pública de disponibilidade sem expor dados confidenciais dos leads/alunos).
+ * Ignora leads com status 'Cancelado' e registros excluídos.
+ */
+export async function getHorariosOcupados(trainerId?: string, dataStr?: string): Promise<string[]> {
+  if (!trainerId || !isValidUuid(trainerId) || !dataStr) {
+    return [];
+  }
+
+  if (supabase) {
+    try {
+      // 1. Tenta invocar a função RPC get_horarios_ocupados
+      const { data, error } = await supabase.rpc('get_horarios_ocupados', {
+        p_trainer_id: trainerId,
+        p_data: dataStr
+      });
+
+      if (!error && Array.isArray(data)) {
+        return data
+          .map((item: any) => (typeof item === 'string' ? item : item?.horario))
+          .filter((h: any): h is string => Boolean(h && typeof h === 'string' && h.trim().length > 0));
+      }
+
+      // 2. Fallback caso a RPC ainda não tenha sido aplicada no banco
+      const fallbackQuery = await supabase
+        .from('leads_agendamentos')
+        .select('horario')
+        .eq('trainer_id', trainerId)
+        .eq('data_preferencia', dataStr)
+        .neq('status', 'Cancelado')
+        .not('horario', 'is', null);
+
+      if (!fallbackQuery.error && fallbackQuery.data) {
+        return fallbackQuery.data
+          .map((r: any) => r.horario)
+          .filter((h: any): h is string => Boolean(h && typeof h === 'string' && h.trim().length > 0));
+      }
+    } catch (e) {
+      console.warn('Erro ao consultar horários ocupados:', e);
+    }
+  }
+
+  return [];
+}
+
+/**
  * Busca leads estritamente vinculados ao trainer_id no Supabase.
  * Nunca retorna leads fictícios de exemplo.
  */

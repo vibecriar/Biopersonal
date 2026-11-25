@@ -171,10 +171,11 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     onShowToast(`Vaga confirmada para ${lead.nome}! Status atualizado para "Avaliação Agendada".`);
   };
 
-  // Mapeamento de atendimentos válidos (inclui Novos Leads, Avaliações Agendadas e Convertidos com data)
+  // Mapeamento de atendimentos válidos (inclui Novos Leads, Avaliações Agendadas e Convertidos com data, ignorando Cancelados)
   const scheduledLeads = useMemo(() => {
     return leads.filter(l => 
-      Boolean(l.data_preferencia) && (
+      Boolean(l.data_preferencia) && 
+      l.status !== 'Cancelado' && (
         l.status === 'Novo Lead' ||
         l.status === 'Avaliação Agendada' || 
         l.status === 'Convertido' ||

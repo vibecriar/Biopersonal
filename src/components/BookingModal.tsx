@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, Clock, Target, Phone, User, CheckCircle2, ArrowRight, Loader2, Sparkles, ShieldCheck } from 'lucide-react';
+import { X, Calendar, Clock, Target, Phone, User, CheckCircle2, ArrowRight, Loader2, Sparkles, ShieldCheck, AlertCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { ProfileConfig, LeadAgendamento } from '../types';
-import { createAgendamento } from '../lib/supabase';
+import { createAgendamento, getHorariosOcupados } from '../lib/supabase';
 import { PrivacyPolicyModal } from './PrivacyPolicyModal';
 
 interface BookingModalProps {
@@ -52,18 +52,65 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const [lgpdConsent, setLgpdConsent] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
+  // Controle de horários ocupados em tempo real no Supabase
+  const [horariosOcupados, setHorariosOcupados] = useState<string[]>([]);
+  const [isLoadingHorarios, setIsLoadingHorarios] = useState(false);
+
   // Obtém a grade dinâmica de horários configurada no Supabase do treinador
   const availableHoursConfig = profile.availableHours || DEFAULT_SHIFT_HOURS;
   const currentShiftHours = availableHoursConfig[turnoPreferencia] || DEFAULT_SHIFT_HOURS[turnoPreferencia] || [];
 
+  // Lista de todos os horários configurados para o dia todo (todos os turnos)
+  const allDayConfiguredHours = useMemo(() => {
+    const hoursSet = new Set<string>();
+    SHIFTS.forEach((s) => {
+      const list = availableHoursConfig[s] || DEFAULT_SHIFT_HOURS[s] || [];
+      list.forEach((h) => hoursSet.add(h));
+    });
+    return Array.from(hoursSet);
+  }, [availableHoursConfig]);
+
+  // Verifica se todos os horários da data escolhida estão ocupados
+  const isEntireDayFull = useMemo(() => {
+    if (allDayConfiguredHours.length === 0) return false;
+    return allDayConfiguredHours.every((h) => horariosOcupados.includes(h));
+  }, [allDayConfiguredHours, horariosOcupados]);
+
   // Reseta seleção ao abrir ou trocar de turno
-  React.useEffect(() => {
+  useEffect(() => {
     if (isOpen) {
       setHorario('');
       setSubmittedLead(null);
       setLgpdConsent(false);
     }
   }, [isOpen]);
+
+  // Consulta horários já agendados para a data selecionada
+  useEffect(() => {
+    let isMounted = true;
+    const fetchOcupados = async () => {
+      if (!isOpen || !profile.id) return;
+      setIsLoadingHorarios(true);
+      try {
+        const ocupados = await getHorariosOcupados(profile.id, dataPreferencia);
+        if (isMounted) {
+          setHorariosOcupados(ocupados);
+          // Se o horário selecionado atualmente estiver ocupado nesta data, desmarca
+          setHorario((prev) => (ocupados.includes(prev) ? '' : prev));
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar horários ocupados:', err);
+      } finally {
+        if (isMounted) setIsLoadingHorarios(false);
+      }
+    };
+
+    fetchOcupados();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, profile.id, dataPreferencia]);
 
   const handleSelectShift = (shift: 'Manhã' | 'Tarde' | 'Noite') => {
     setTurnoPreferencia(shift);
@@ -148,11 +195,26 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       return;
     }
 
+    if (!profile.id) {
+      alert('Erro ao agendar: Identificador do personal (trainer_id) não encontrado.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
+      // Verificação de concorrência em tempo real antes de gravar para evitar duplo agendamento
+      const latestOcupados = await getHorariosOcupados(profile.id, dataPreferencia);
+      if (latestOcupados.includes(horario)) {
+        setHorariosOcupados(latestOcupados);
+        setHorario('');
+        setIsLoading(false);
+        alert('Este horário acabou de ser reservado por outro aluno! Por favor, selecione outro horário ou outro dia.');
+        return;
+      }
+
       const result = await createAgendamento({
-        trainer_id: profile.id || undefined,
+        trainer_id: profile.id,
         nome: nome.trim(),
         whatsapp: cleanPhone,
         objetivo,
@@ -161,27 +223,21 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         horario: horario,
         observacoes: observacoes.trim(),
         plano_interesse: initialService || 'Avaliação Inicial',
+        status: 'Novo Lead',
         consentimento_lgpd: true
       });
+
+      if (!result.success) {
+        alert('Erro ao agendar: ' + (result.error || 'Erro desconhecido ao registrar agendamento.'));
+        setIsLoading(false);
+        return;
+      }
 
       triggerConfetti();
       onShowToast('Agendamento recebido com sucesso!');
 
       if (result.data) {
         setSubmittedLead(result.data);
-      } else {
-        setSubmittedLead({
-          id: 'temp',
-          created_at: new Date().toISOString(),
-          nome,
-          whatsapp: cleanPhone,
-          objetivo,
-          data_preferencia: dataPreferencia,
-          turno_preferencia: turnoPreferencia,
-          horario: horario,
-          observacoes,
-          status: 'Novo Lead'
-        });
       }
 
       // Redirecionamento automático para o WhatsApp após 1.5s
@@ -354,11 +410,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                             type="button"
                             key={obj.id}
                             onClick={() => setObjetivo(obj.id)}
-                            className={`p-2.5 rounded-xl text-left border transition-all ${
-                              isSelected
+                            className={`p-2.5 rounded-xl text-left border transition-all ${isSelected
                                 ? 'bg-brand-500/20 border-brand-500 text-white shadow-[0_0_15px_rgba(255,122,0,0.25)]'
                                 : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
-                            }`}
+                              }`}
                           >
                             <div className="text-xs font-bold">{obj.label}</div>
                             <div className="text-[10px] text-slate-400 mt-0.5">{obj.desc}</div>
@@ -396,11 +451,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                             type="button"
                             key={shift}
                             onClick={() => handleSelectShift(shift)}
-                            className={`py-2 px-1 text-center rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                              turnoPreferencia === shift
+                            className={`py-2 px-1 text-center rounded-xl text-xs font-bold border transition-all cursor-pointer ${turnoPreferencia === shift
                                 ? 'bg-brand-500 text-slate-950 border-brand-500 shadow-[0_0_12px_rgba(255,122,0,0.3)]'
                                 : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
-                            }`}
+                              }`}
                           >
                             {shift}
                           </button>
@@ -416,32 +470,53 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                         <Clock className="w-3.5 h-3.5 text-brand-500" />
                         Horários Disponíveis no Turno ({turnoPreferencia})
                       </span>
-                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border transition-all ${
-                        horario
+                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border transition-all ${horario
                           ? 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30'
                           : 'text-brand-400 bg-brand-500/10 border-brand-500/30 animate-pulse'
-                      }`}>
+                        }`}>
                         {horario ? `Horário: ${horario}` : 'Obrigatório'}
                       </span>
                     </label>
 
-                    <div className={`grid gap-1.5 ${
-                      currentShiftHours.length === 6 
-                        ? 'grid-cols-3 sm:grid-cols-6' 
+                    {isEntireDayFull && (
+                      <div className="mb-2.5 p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center gap-2 text-rose-300 text-xs font-semibold">
+                        <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                        <span>Sem horários livres nesta data, escolha outro dia</span>
+                      </div>
+                    )}
+
+                    <div className={`grid gap-1.5 ${currentShiftHours.length === 6
+                        ? 'grid-cols-3 sm:grid-cols-6'
                         : 'grid-cols-2 sm:grid-cols-4'
-                    }`}>
+                      }`}>
                       {currentShiftHours.map((h) => {
+                        const isOccupied = horariosOcupados.includes(h);
                         const isSelected = horario === h;
+
+                        if (isOccupied) {
+                          return (
+                            <button
+                              type="button"
+                              key={h}
+                              disabled
+                              title="Horário já reservado por outro aluno"
+                              className="py-2 px-1 text-center rounded-xl text-xs font-mono border opacity-40 cursor-not-allowed bg-rose-950/20 border-rose-900/40 text-rose-300/80 flex flex-col items-center justify-center gap-0.5 select-none"
+                            >
+                              <span className="line-through">{h}</span>
+                              <span className="text-[9px] font-bold uppercase tracking-wider text-rose-400">Ocupado</span>
+                            </button>
+                          );
+                        }
+
                         return (
                           <button
                             type="button"
                             key={h}
                             onClick={() => setHorario(h)}
-                            className={`py-2.5 px-1.5 text-center rounded-xl text-xs font-mono font-bold border transition-all cursor-pointer ${
-                              isSelected
+                            className={`py-2.5 px-1.5 text-center rounded-xl text-xs font-mono font-bold border transition-all cursor-pointer ${isSelected
                                 ? 'bg-brand-500 text-slate-950 border-brand-400 shadow-[0_0_15px_rgba(255,122,0,0.45)] scale-[1.03] ring-2 ring-brand-400/50 font-black'
                                 : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:border-white/20 hover:text-white'
-                            }`}
+                              }`}
                           >
                             {h}
                           </button>
@@ -449,7 +524,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                       })}
                     </div>
 
-                    {!horario && (
+                    {!horario && !isEntireDayFull && (
                       <p className="text-[11px] text-amber-400/90 mt-1.5 flex items-center gap-1 font-medium">
                         <span>⚠️ Selecione um dos horários acima para reservar.</span>
                       </p>
