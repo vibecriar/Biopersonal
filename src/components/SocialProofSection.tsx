@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, Trophy, Sparkles, X, ChevronRight, Quote } from 'lucide-react';
+import { Star, Trophy, Sparkles, X, ChevronRight, ChevronLeft, Quote } from 'lucide-react';
 import { ProfileConfig, SocialProofResultItem } from '../types';
 
 interface SocialProofSectionProps {
@@ -19,6 +19,8 @@ const GoogleIcon = () => (
 export const SocialProofSection: React.FC<SocialProofSectionProps> = ({ profile }) => {
   const socialProof = profile.socialProof;
   const [selectedPhoto, setSelectedPhoto] = useState<SocialProofResultItem | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const carouselRef = useRef<HTMLDivElement>(null);
 
   // Regra: Se o personal ainda não cadastrou nenhum resultado ou desativou no CRM, oculta
   const isAtivo = socialProof?.ativo !== false;
@@ -33,6 +35,59 @@ export const SocialProofSection: React.FC<SocialProofSectionProps> = ({ profile 
           }))
         : []);
 
+  // Agrupa os resultados em páginas de 2 cards cada (2 visíveis lado a lado)
+  const chunkedResults = useMemo(() => {
+    const chunks: SocialProofResultItem[][] = [];
+    for (let i = 0; i < results.length; i += 2) {
+      chunks.push(results.slice(i, i + 2));
+    }
+    return chunks;
+  }, [results]);
+
+  const totalPages = chunkedResults.length;
+
+  useEffect(() => {
+    if (currentPage >= totalPages) {
+      setCurrentPage(Math.max(0, totalPages - 1));
+    }
+  }, [totalPages, currentPage]);
+
+  const scrollToPage = (pageIndex: number) => {
+    if (!carouselRef.current) return;
+    const container = carouselRef.current;
+    const slideWidth = container.clientWidth;
+    container.scrollTo({
+      left: pageIndex * slideWidth,
+      behavior: 'smooth'
+    });
+    setCurrentPage(pageIndex);
+  };
+
+  const handlePrev = () => {
+    if (currentPage > 0) {
+      scrollToPage(currentPage - 1);
+    }
+  };
+
+  const handleNext = () => {
+    if (currentPage < totalPages - 1) {
+      scrollToPage(currentPage + 1);
+    }
+  };
+
+  const handleScroll = () => {
+    if (!carouselRef.current) return;
+    const container = carouselRef.current;
+    const scrollLeft = container.scrollLeft;
+    const slideWidth = container.clientWidth;
+    if (slideWidth > 0) {
+      const page = Math.round(scrollLeft / slideWidth);
+      if (page !== currentPage && page >= 0 && page < totalPages) {
+        setCurrentPage(page);
+      }
+    }
+  };
+
   if (!isAtivo || results.length === 0) {
     return null;
   }
@@ -41,6 +96,47 @@ export const SocialProofSection: React.FC<SocialProofSectionProps> = ({ profile 
   const ratingText = socialProof?.ratingText || 'Avaliação 5.0 no Google';
   const totalStudents = socialProof?.totalStudents || '+ de 300 alunos transformados';
 
+  const renderCard = (item: SocialProofResultItem, index: number) => (
+    <motion.div
+      key={item.id || index}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      whileHover={{ scale: 1.015 }}
+      onClick={() => setSelectedPhoto(item)}
+      className="group rounded-2xl glass-card overflow-hidden border border-white/15 hover:border-brand-500/60 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-[0_0_20px_rgba(var(--brand-500-rgb,249_115_22),0.2)] flex flex-col justify-between h-full bg-slate-900/60"
+    >
+      {/* Foto do Resultado: aspect-[4/3] com object-cover uniforme */}
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-black/40">
+        <img
+          src={item.photoUrl}
+          alt={`Resultado de ${item.name}`}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          loading="lazy"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent pointer-events-none" />
+
+        {/* Badges sobre a foto: Nome do Aluno e Botão Ver Foto */}
+        <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-1 pointer-events-none">
+          <span className="text-[11px] sm:text-xs font-black text-white px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-md border border-white/20 shadow-md truncate max-w-[62%]">
+            {item.name}
+          </span>
+          <span className="text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-brand-500/30 text-brand-300 border border-brand-500/40 shrink-0">
+            Ver foto
+          </span>
+        </div>
+      </div>
+
+      {/* Depoimento limitado a no máximo 2 linhas (line-clamp-2) com altura fixa */}
+      <div className="p-2.5 sm:p-3 flex items-start gap-1.5 flex-1 bg-white/[0.02]">
+        <Quote className="w-3.5 h-3.5 text-brand-400 shrink-0 mt-0.5 rotate-180" />
+        <p className="text-[11px] sm:text-xs text-slate-200 font-medium leading-snug italic line-clamp-2 h-[2.25rem] sm:h-[2.5rem] overflow-hidden">
+          "{item.result}"
+        </p>
+      </div>
+    </motion.div>
+  );
+
   return (
     <section className="w-full max-w-md sm:max-w-xl md:max-w-2xl mx-auto px-4 mt-2 mb-4">
       {/* 1. SELO ESTILO GOOGLE MEU NEGÓCIO NO TOPO */}
@@ -48,7 +144,7 @@ export const SocialProofSection: React.FC<SocialProofSectionProps> = ({ profile 
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="mb-3.5 p-3 sm:p-3.5 rounded-2xl glass-card border border-white/15 flex flex-col sm:flex-row items-center justify-between gap-2.5 shadow-lg relative overflow-hidden group hover:border-brand-500/50 transition-all"
+        className="mb-3 p-3 sm:p-3.5 rounded-2xl glass-card border border-white/15 flex flex-col sm:flex-row items-center justify-between gap-2.5 shadow-lg relative overflow-hidden group hover:border-brand-500/50 transition-all"
       >
         {/* Glow sutil da cor primária */}
         <div className="absolute top-0 right-0 -mr-8 -mt-8 w-24 h-24 bg-brand-500/15 rounded-full blur-xl pointer-events-none" />
@@ -78,62 +174,93 @@ export const SocialProofSection: React.FC<SocialProofSectionProps> = ({ profile 
         </div>
       </motion.div>
 
-      {/* 2. CABEÇALHO DA SEÇÃO DE RESULTADOS */}
+      {/* 2. CABEÇALHO DA SEÇÃO DE RESULTADOS COM SETAS DE NAVEGAÇÃO */}
       <div className="flex items-center justify-between mb-2.5 px-1">
-        <div className="flex items-center gap-1.5">
-          <Trophy className="w-3.5 h-3.5 text-brand-400" />
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Trophy className="w-3.5 h-3.5 text-brand-400 shrink-0" />
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300 truncate">
             Resultados Reais & Transformações
           </h2>
         </div>
-        <span className="text-[11px] text-slate-400 font-medium">
-          {results.length} {results.length === 1 ? 'aluno' : 'alunos'}
-        </span>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[11px] text-slate-400 font-medium">
+            {results.length} {results.length === 1 ? 'aluno' : 'alunos'}
+          </span>
+
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={handlePrev}
+                disabled={currentPage === 0}
+                aria-label="Slide anterior"
+                className="p-1 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:text-white hover:bg-white/10 disabled:opacity-25 disabled:cursor-not-allowed transition-all cursor-pointer"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={handleNext}
+                disabled={currentPage >= totalPages - 1}
+                aria-label="Próximo slide"
+                className="p-1 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:text-white hover:bg-white/10 disabled:opacity-25 disabled:cursor-not-allowed transition-all cursor-pointer"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* 3. GRADE / CARROSSEL DE CARDS DOS ALUNOS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {results.map((item, index) => (
-          <motion.div
-            key={item.id || index}
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: index * 0.08 }}
-            whileHover={{ scale: 1.015 }}
-            onClick={() => setSelectedPhoto(item)}
-            className="group rounded-2xl glass-card overflow-hidden border border-white/15 hover:border-brand-500/60 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-[0_0_30px_rgba(var(--brand-500-rgb,249_115_22),0.2)] flex flex-col justify-between"
+      {/* 3. CARROSSEL DE CARDS DOS ALUNOS (2 LADO A LADO) OU CARD ÚNICO */}
+      {results.length === 1 ? (
+        <div className="max-w-xs sm:max-w-sm mx-auto">
+          {renderCard(results[0], 0)}
+        </div>
+      ) : (
+        <div className="relative">
+          <div
+            ref={carouselRef}
+            onScroll={handleScroll}
+            className="flex w-full overflow-x-auto snap-x snap-mandatory scroll-smooth gap-0 scrollbar-none"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
-            {/* Foto do Resultado */}
-            <div className="relative aspect-[16/10] sm:aspect-[4/3] w-full overflow-hidden bg-black/40">
-              <img
-                src={item.photoUrl}
-                alt={`Resultado de ${item.name}`}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                loading="lazy"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-
-              {/* Badge de Nome do Aluno */}
-              <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between">
-                <span className="text-xs font-black text-white px-2.5 py-1 rounded-lg bg-black/75 backdrop-blur-md border border-white/20 shadow-md">
-                  {item.name}
-                </span>
-                <span className="text-[10px] font-bold text-slate-300 px-2 py-0.5 rounded-md bg-brand-500/30 text-brand-300 border border-brand-500/40">
-                  Ver foto
-                </span>
+            {chunkedResults.map((chunk, pageIndex) => (
+              <div
+                key={pageIndex}
+                className="w-full shrink-0 snap-center snap-always px-0.5"
+              >
+                <div className="grid grid-cols-2 gap-2 sm:gap-3 w-full">
+                  {chunk.map((item, itemIdx) => renderCard(item, pageIndex * 2 + itemIdx))}
+                  {chunk.length === 1 && (
+                    <div className="opacity-0 pointer-events-none" />
+                  )}
+                </div>
               </div>
-            </div>
+            ))}
+          </div>
 
-            {/* Resultado Conquistado / Depoimento */}
-            <div className="p-3.5 flex items-start gap-2">
-              <Quote className="w-4 h-4 text-brand-400 shrink-0 mt-0.5 rotate-180" />
-              <p className="text-xs text-slate-200 font-medium leading-relaxed italic line-clamp-2">
-                "{item.result}"
-              </p>
+          {/* 4. INDICADORES / BOLINHAS DE PAGINAÇÃO */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-1.5 mt-2.5">
+              {Array.from({ length: totalPages }).map((_, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => scrollToPage(idx)}
+                  aria-label={`Ir para página ${idx + 1}`}
+                  className={`transition-all duration-300 rounded-full cursor-pointer ${
+                    currentPage === idx
+                      ? 'w-5 h-1.5 bg-brand-500 shadow-[0_0_8px_rgba(249,115,22,0.6)]'
+                      : 'w-1.5 h-1.5 bg-white/20 hover:bg-white/40'
+                  }`}
+                />
+              ))}
             </div>
-          </motion.div>
-        ))}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* MODAL DE ZOOM / VISUALIZAÇÃO AMPLIADA DA FOTO */}
       <AnimatePresence>
