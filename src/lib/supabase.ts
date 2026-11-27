@@ -45,13 +45,14 @@ export const isValidUuid = (val?: string | null): boolean => {
 };
 
 /**
- * Cria um novo agendamento vinculado estritamente ao trainer_id
+ * Cria um novo agendamento vinculado estritamente ao trainer_id.
+ * Não encadeia .select() após o insert para evitar violação de RLS para visitantes anônimos (anon).
  */
 export async function createAgendamento(
   data: Omit<LeadAgendamento, 'id' | 'created_at' | 'status'> & { status?: LeadStatus }
 ): Promise<{ success: boolean; data?: LeadAgendamento; error?: string }> {
   if (!data.trainer_id || !isValidUuid(data.trainer_id)) {
-    return { success: false, error: 'Trainer ID inválido para agendamento.' };
+    return { success: false, error: 'Identificador do personal (trainer_id) inválido ou ausente.' };
   }
 
   if (supabase) {
@@ -74,18 +75,36 @@ export async function createAgendamento(
         consentimento_lgpd: data.consentimento_lgpd !== false
       };
 
-      const { data: inserted, error } = await supabase
+      // Inserção direta sem .select() para visitantes anônimos (anon)
+      const { error } = await supabase
         .from('leads_agendamentos')
-        .insert([payload])
-        .select()
-        .single();
+        .insert([payload]);
 
-      if (!error && inserted) {
-        return { success: true, data: inserted as LeadAgendamento };
-      }
       if (error) {
         return { success: false, error: error.message };
       }
+
+      const createdLead: LeadAgendamento = {
+        id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'lead_' + Date.now(),
+        created_at: new Date().toISOString(),
+        trainer_id: payload.trainer_id,
+        nome: payload.nome,
+        whatsapp: payload.whatsapp,
+        objetivo: payload.objetivo,
+        data_preferencia: payload.data_preferencia,
+        turno_preferencia: payload.turno_preferencia,
+        observacoes: payload.observacoes,
+        plano_interesse: payload.plano_interesse,
+        status: payload.status,
+        plano_tipo: payload.plano_tipo,
+        plano_valor: payload.plano_valor,
+        horario: payload.horario,
+        tipo_atendimento: payload.tipo_atendimento,
+        payment_method: payload.payment_method,
+        consentimento_lgpd: payload.consentimento_lgpd
+      };
+
+      return { success: true, data: createdLead };
     } catch (err: any) {
       return { success: false, error: err?.message || 'Erro ao registrar agendamento' };
     }

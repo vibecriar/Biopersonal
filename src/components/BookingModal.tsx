@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar, Clock, Target, Phone, User, CheckCircle2, ArrowRight, Loader2, Sparkles, ShieldCheck, AlertCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { ProfileConfig, LeadAgendamento } from '../types';
-import { createAgendamento, getHorariosOcupados } from '../lib/supabase';
+import { createAgendamento, getHorariosOcupados, isValidUuid } from '../lib/supabase';
 import { PrivacyPolicyModal } from './PrivacyPolicyModal';
 
 interface BookingModalProps {
@@ -195,8 +195,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       return;
     }
 
-    if (!profile.id) {
-      alert('Erro ao agendar: Identificador do personal (trainer_id) não encontrado.');
+    const targetTrainerId = profile.id;
+    if (!targetTrainerId || !isValidUuid(targetTrainerId)) {
+      alert('Erro ao agendar: Identificador do personal (trainer_id) não encontrado ou inválido.');
       return;
     }
 
@@ -204,7 +205,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
     try {
       // Verificação de concorrência em tempo real antes de gravar para evitar duplo agendamento
-      const latestOcupados = await getHorariosOcupados(profile.id, dataPreferencia);
+      const latestOcupados = await getHorariosOcupados(targetTrainerId, dataPreferencia);
       if (latestOcupados.includes(horario)) {
         setHorariosOcupados(latestOcupados);
         setHorario('');
@@ -214,7 +215,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       }
 
       const result = await createAgendamento({
-        trainer_id: profile.id,
+        trainer_id: targetTrainerId,
         nome: nome.trim(),
         whatsapp: cleanPhone,
         objetivo,
